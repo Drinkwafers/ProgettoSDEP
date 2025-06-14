@@ -1,0 +1,60 @@
+#tabellone
+{
+    display: inline-flex;
+    flex-direction: column;
+}
+
+#blocco-centrale
+{
+    display: inline-flex;
+}
+
+table
+{
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#casa-blu
+{
+    background-color: blue;
+}
+
+#casa-rosso
+{
+    background-color: red;
+}
+
+#casa-verde
+{
+    background-color: green;
+}
+
+#casa-giallo
+{
+    background-color: yellow;
+}
+
+#cammino
+{
+    background-color: #f2f2f2;
+}
+
+td
+{
+    border: 1px solid black;
+    padding: 0.5em;
+    text-align: left;
+    width: 1em;
+    height: 1em;
+}
+
+#su
+{
+    rotate: 90deg;
+}
+
+#giu
+{
+    rotate: -90deg;
+}
