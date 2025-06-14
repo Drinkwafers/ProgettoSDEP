@@ -1,0 +1,26 @@
+{
+  "name": "progettosdep",
+  "version": "1.0.0",
+  "main": "server-login.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Drinkwafers/ProgettoSDEP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Drinkwafers/ProgettoSDEP/issues"
+  },
+  "homepage": "https://github.com/Drinkwafers/ProgettoSDEP#readme",
+  "description": "",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1"
+  }
+}
