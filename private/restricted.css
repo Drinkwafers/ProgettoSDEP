@@ -2,6 +2,8 @@
                 display: inline-flex;
                 flex-direction: column;
                 align-items: center;
+                gap: 1.8em;
+                margin-top: 1em;
             }
 
             #blocco-centrale {
@@ -40,8 +42,8 @@
                 border: 1px solid black;
                 padding: 0.5em;
                 text-align: left;
-                width: 2em;
-                height: 2em;
+                width: 1.8em;
+                height: 1.8em;
                 box-sizing: border-box;
             }
 
