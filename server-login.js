@@ -47,6 +47,66 @@ function authenticateToken(req, res, next) {
 app.use("/private", authenticateToken, express.static("private"));
 
 
+// Endpoint registrazione
+app.post("/api/register", async (req, res) => {
+    const { nome, email, password } = req.body;
+
+    // Validazione input
+    if (!nome || !email || !password) {
+        return res.status(400).json({
+            success: false,
+            message: "Nome, email e password sono obbligatori"
+        });
+    }
+
+    // Validazione lunghezza password
+    if (password.length < 6) {
+        return res.status(400).json({
+            success: false,
+            message: "La password deve essere di almeno 6 caratteri"
+        });
+    }
+
+    // Validazione email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: "Email non valida"
+        });
+    }
+
+    try {
+        // Controllo se l'email esiste già
+        const checkQuery = "SELECT id FROM utenti WHERE email = ?";
+        const [existingUsers] = await pool.promise().execute(checkQuery, [email]);
+
+        if (existingUsers.length > 0) {
+            return res.status(409).json({ // Conflict
+                success: false,
+                message: "Email già registrata"
+            });
+        }
+
+        // Inserimento nuovo utente
+        const insertQuery = "INSERT INTO utenti (nome, email, password) VALUES (?, ?, ?)";
+        const [result] = await pool.promise().execute(insertQuery, [nome, email, password]);
+
+        return res.status(201).json({
+            success: true,
+            message: "Registrazione completata con successo"
+        });
+
+    } catch (err) {
+        console.error("Errore query DB registrazione:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Errore interno al server"
+        });
+    }
+});
+
+
 // Endpoint login con controllo nel DB
 app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;

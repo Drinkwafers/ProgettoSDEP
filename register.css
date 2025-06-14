@@ -1,0 +1,257 @@
+/* Reset e impostazioni base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Titolo principale */
+h1 {
+    color: white;
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+/* Contenitore del form */
+#registerForm {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 450px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Etichette */
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #333;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Input fields */
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 2px solid #e1e1e1;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+    outline: none;
+    border-color: #764ba2;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Validazione password in tempo reale */
+input[type="password"]:invalid {
+    border-color: #ff6b6b;
+}
+
+input[type="password"]:valid {
+    border-color: #51cf66;
+}
+
+/* Pulsante di submit */
+button[type="submit"] {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(118, 75, 162, 0.3);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+}
+
+button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Messaggio di stato */
+#message {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 500;
+    min-height: 20px;
+    transition: all 0.3s ease;
+}
+
+/* Stili per messaggi di errore */
+#message.error {
+    background-color: rgba(255, 235, 238, 0.9);
+    color: #c62828;
+    border: 1px solid rgba(255, 205, 210, 0.8);
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Stili per messaggi di successo */
+#message.success {
+    background-color: rgba(232, 245, 233, 0.9);
+    color: #2e7d32;
+    border: 1px solid rgba(200, 230, 201, 0.8);
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Link al login */
+a {
+    display: inline-block;
+    margin-top: 2rem;
+    color: white;
+    text-decoration: none;
+    font-size: 0.95rem;
+    padding: 0.8rem 1.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+a:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Indicatore forza password */
+.password-strength {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: -10px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.password-strength.weak {
+    background-color: #ff6b6b;
+    width: 33%;
+}
+
+.password-strength.medium {
+    background-color: #ffd93d;
+    width: 66%;
+}
+
+.password-strength.strong {
+    background-color: #51cf66;
+    width: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    #registerForm {
+        padding: 2rem;
+        margin: 0 10px;
+        max-width: 100%;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        padding: 0.8rem;
+    }
+    
+    button[type="submit"] {
+        padding: 0.8rem;
+        font-size: 1rem;
+    }
+}
+
+/* Animazioni */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+#registerForm {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+h1 {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+a {
+    animation: fadeInUp 0.8s ease-out;
+}
+
+/* Stili per campi specifici */
+input[type="text"]:focus,
+input[type="email"]:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
