@@ -33,7 +33,7 @@ img
 
 #sinistra, #destra
 {
-    z-index: 100;
+    z-index: 109;
 }
 
 table
@@ -44,21 +44,25 @@ table
 #casa-blu
 {
     background-color: blue;
+    /*z-index: 100;*/
 }
 
 #casa-rosso
 {
     background-color: red;
+    z-index: 101;
 }
 
 #casa-verde
 {
     background-color: green;
+    z-index: 102;
 }
 
 #casa-giallo
 {
     background-color: yellow;
+    /*z-index: 103;*/
 }
 
 #cammino
