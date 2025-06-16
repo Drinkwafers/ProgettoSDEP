@@ -3,6 +3,12 @@ body
     margin: 0; /* per poter usare 100vh */
 }
 
+img
+{
+    width: inherit;
+    height: inherit;
+}
+
 #tabellone
 {
     display: inline-flex; 
