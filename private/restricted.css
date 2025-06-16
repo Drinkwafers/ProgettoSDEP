@@ -1,9 +1,15 @@
+body
+{
+    margin: 0;
+}
+
 #tabellone {
                 display: inline-flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 1.8em;
-                margin-top: 1em;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    justify-content: center;
+    align-items: center;
             }
 
             #blocco-centrale {
@@ -11,6 +17,11 @@
                 align-items: center;
                 justify-content: center;
                 gap: 0;
+            }
+
+            #sinistra, #destra
+            {
+                z-index: 100;
             }
 
             table {
@@ -34,18 +45,17 @@
                 background-color: yellow;
             }
 
-            #cammino {
+            #cammino ,#bianca{
                 background-color: #f2f2f2;
             }
 
             td {
                 border: 1px solid black;
-                padding: 0.5em;
-                text-align: left;
-                width: 1.8em;
-                height: 1.8em;
+                width: 4em;
+                height: 4em;
                 box-sizing: border-box;
             }
+
 
             #su {
                 transform: rotate(90deg);
@@ -55,9 +65,9 @@
                 transform: rotate(-90deg);
             }
 
-            #sinistra {
-                /* Nessuna rotazione necessaria per il bottom */
-            }
+            /*#sinistra {
+                /* Nessuna rotazione necessaria per il bottom
+            }*/
 
             #destra {
                 transform: rotate(180deg);
@@ -69,11 +79,6 @@
             }
 
             /* Assicuriamo che le tabelle laterali abbiano la stessa larghezza */
-            #sinistra, #destra {
-                width: auto;
-            }
-
-            /* Allineamento delle tabelle superiore e inferiore */
-            #su, #giu {
+            #sinistra, #destra, #su, #giu{
                 width: auto;
             }
