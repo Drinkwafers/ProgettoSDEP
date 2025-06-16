@@ -59,33 +59,24 @@ td
     border: 1px solid black;
     width: 4em;
     height: 4em;
-    box-sizing: border-box;  /**/
+    box-sizing: border-box;  /* non conta il padding */
 }
 
+#su
+{
+    transform: rotate(90deg);
+}
 
-            #su {
-                transform: rotate(90deg);
-            }
+#giu
+{
+    transform: rotate(-90deg);
+}
 
-            #giu {
-                transform: rotate(-90deg);
-            }
+/*#sinistra {
+    /* Nessuna rotazione necessaria per il bottom
+}*/
 
-            /*#sinistra {
-                /* Nessuna rotazione necessaria per il bottom
-            }*/
-
-            #destra {
-                transform: rotate(180deg);
-            }
-
-            /* Tabella centrale */
-            .centro {
-                margin: 0;
-            }
-
-            /* Assicuriamo che le tabelle laterali abbiano la stessa larghezza */
-            #sinistra, #destra, #su, #giu{
-                width: auto;
-                border: 0;
-            }
+#destra
+{
+    transform: rotate(180deg);
+}
