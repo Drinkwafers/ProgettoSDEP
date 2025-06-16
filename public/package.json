@@ -1,0 +1,13 @@
+{
+  "name": "public",
+  "version": "1.0.0",
+  "description": "",
+  "main": "client-index.js",
+  "scripts": {
+    "start": "node server-index.js"
+
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
