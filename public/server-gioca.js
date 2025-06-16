@@ -1,3 +1,10 @@
+function tiraDado()
+{
+    let s = Math.floor(Math.random() * 6) + 1;;
+    console.log(s);
+    window.alert(s)
+}
+
 function moveImageToNext(currentCell)
 {
     const image = currentCell.querySelector("img");
@@ -11,7 +18,8 @@ function moveImageToNext(currentCell)
     const nextIndex = (currentIndex + 1) % cells.length;
     const nextCell = cells[nextIndex];
     
-    if (nextCell) {
+    if (nextCell)
+    {
         // Rimuovi la classe dalla cella corrente
         currentCell.classList.remove('has-image');
         // Aggiungi la classe alla nuova cella
@@ -23,15 +31,36 @@ function moveImageToNext(currentCell)
     return false;
 }
 
-    // Aggiungi event listener a tutte le celle
-    document.querySelectorAll('td').forEach(cell => {
-        cell.addEventListener('click', () => {
-            const hasImage = cell.querySelector('img');
-            if (hasImage) {
-                moveImageToNext(cell);
-            }
-        });
-    });
+function resetGame()
+{
+    const table = document.getElementById('gameTable');
+    const cells = table.querySelectorAll('td');
+    const firstCell = cells[0];
+    
+    // Rimuovi tutte le classi has-image
+    cells.forEach(cell => cell.classList.remove('has-image'));
+    
+    // Trova l'immagine e spostala nella prima cella
+    const image = table.querySelector('img');
+    if (image)
+    {
+        firstCell.appendChild(image);
+        firstCell.classList.add('has-image');
+    }
+}
 
-    // Inizializza la prima cella con la classe
-    document.querySelector('td').classList.add('has-image');
+// Aggiungi event listener a tutte le celle
+document.querySelectorAll('td').forEach(cell => {
+    cell.addEventListener('click', () => {
+        const hasImage = cell.querySelector('img');
+        if (hasImage)
+        {
+            moveImageToNext(cell);
+        }
+    });
+});
+
+window.addEventListener("load", function()
+{
+    document.querySelector('.casella-1').classList.add('has-image');
+});

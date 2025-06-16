@@ -279,50 +279,6 @@ class LudoServer {
         console.log(`Partita ${gameId} iniziata`);
     }
 
-    rollDice(clientId, data) {
-        const client = this.clients.get(clientId);
-        if (!client) return;
-
-        const { gameId, playerId } = data;
-        const game = this.games.get(gameId);
-        
-        if (!game) {
-            this.sendError(client.ws, 'Partita non trovata');
-            return;
-        }
-
-        if (game.status !== 'playing') {
-            this.sendError(client.ws, 'La partita non è iniziata');
-            return;
-        }
-
-        if (game.currentPlayer !== playerId) {
-            this.sendError(client.ws, 'Non è il tuo turno');
-            return;
-        }
-
-        // Tira il dado (1-6)
-        const diceValue = Math.floor(Math.random() * 6) + 1;
-        game.lastDiceRoll = diceValue;
-
-        // Notifica il risultato del dado
-        this.broadcastToGame(gameId, {
-            type: 'dice-rolled',
-            data: {
-                playerId: playerId,
-                diceValue: diceValue,
-                gameState: this.getGameStateForClient(game)
-            }
-        });
-
-        // Passa al prossimo giocatore dopo un breve delay
-        setTimeout(() => {
-            this.nextPlayer(game);
-        }, 2000);
-
-        console.log(`${this.getPlayerName(game, playerId)} ha tirato ${diceValue} nella partita ${gameId}`);
-    }
-
     nextPlayer(game) {
         const currentIndex = game.players.findIndex(p => p.id === game.currentPlayer);
         const nextIndex = (currentIndex + 1) % game.players.length;
