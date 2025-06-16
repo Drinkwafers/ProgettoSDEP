@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ludo Online</title>
+    <link rel="stylesheet" href="index.css">
+    <script src="client-index.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 Ludo Online</h1>
+        
+        <div id="mainMenu">
+            <div class="menu-section">
+                <h2>Crea Nuova Partita</h2>
+                <div class="input-group">
+                    <label for="playerName">Il tuo nome:</label>
+                    <input type="text" id="playerName" placeholder="Inserisci il tuo nome">
+                </div>
+                <button class="btn" onclick="createGame()">Crea Partita</button>
+            </div>
+
+            <div class="menu-section">
+                <h2>Entra in una Partita</h2>
+                <div class="input-group">
+                    <label for="joinPlayerName">Il tuo nome:</label>
+                    <input type="text" id="joinPlayerName" placeholder="Inserisci il tuo nome">
+                </div>
+                <div class="input-group">
+                    <label for="gameId">ID Partita:</label>
+                    <input type="text" id="gameId" placeholder="Inserisci l'ID della partita">
+                </div>
+                <button class="btn btn-secondary" onclick="joinGame()">Entra in Partita</button>
+            </div>
+        </div>
+
+        <div id="gameInfo" class="game-info">
+            <h3>Informazioni Partita</h3>
+            <p><strong>ID Partita:</strong> <span id="currentGameId"></span></p>
+            <p><strong>Giocatori:</strong> <span id="playerCount"></span>/4</p>
+            <ul id="playersList" class="player-list"></ul>
+            <button class="btn" onclick="startGame()" id="startGameBtn" style="display: none;">Inizia Partita</button>
+            <button class="btn btn-secondary" onclick="leaveGame()">Lascia Partita</button>
+        </div>
+
+        <div id="status" class="status hidden"></div>
+    </div>
+
+</body>
+</html>
