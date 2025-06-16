@@ -1,0 +1,82 @@
+body
+{
+    margin: 0; /* per poter usare 100vh */
+}
+
+#tabellone
+{
+    display: inline-flex; 
+    flex-direction: column; /* divido il tabellone in tre blocchi orizzontali */
+    width: 100%;
+    height: 100vh;
+    justify-content: center;
+    align-items: center;
+}
+
+#blocco-centrale, #blocco-superiore, #blocco-inferiore
+{
+    display: flex; /* altrimenti resterebbero tutti semplicemente in colonna */
+    align-items: center;
+}
+
+#sinistra, #destra
+{
+    z-index: 100;
+}
+
+table
+{
+    border-collapse: collapse;
+}
+
+#casa-blu
+{
+    background-color: blue;
+}
+
+#casa-rosso
+{
+    background-color: red;
+}
+
+#casa-verde
+{
+    background-color: green;
+}
+
+#casa-giallo
+{
+    background-color: yellow;
+}
+
+#cammino
+{
+    background-color: #f2f2f2;
+}
+
+td
+{
+    border: 1px solid black;
+    width: 4em;
+    height: 4em;
+    box-sizing: border-box;  /* non conta il padding */
+}
+
+#su
+{
+    transform: rotate(90deg);
+}
+
+#giu
+{
+    transform: rotate(-90deg);
+}
+
+/*#sinistra {
+    /* Nessuna rotazione necessaria per il bottom
+}*/
+
+#destra
+{
+    transform: rotate(180deg);
+}
