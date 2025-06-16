@@ -23,15 +23,15 @@ function moveImageToNext(currentCell)
     return false;
 }
 
-// Aggiungi event listener a tutte le celle
-document.querySelectorAll('td').forEach(cell => {
-    cell.addEventListener('click', () => {
-        const hasImage = cell.querySelector('img');
-        if (hasImage) {
-            moveImageToNext(cell);
-        }
+    // Aggiungi event listener a tutte le celle
+    document.querySelectorAll('td').forEach(cell => {
+        cell.addEventListener('click', () => {
+            const hasImage = cell.querySelector('img');
+            if (hasImage) {
+                moveImageToNext(cell);
+            }
+        });
     });
-});
 
-// Inizializza la prima cella con la classe
-document.querySelector('td').classList.add('has-image');
+    // Inizializza la prima cella con la classe
+    document.querySelector('td').classList.add('has-image');
