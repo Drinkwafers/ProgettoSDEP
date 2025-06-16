@@ -1,60 +1,66 @@
 body
 {
-    margin: 0;
+    margin: 0; /* per poter usare 100vh */
 }
 
-#tabellone {
-                display: inline-flex;
-    flex-direction: column;
+#tabellone
+{
+    display: inline-flex; 
+    flex-direction: column; /* divido il tabellone in tre blocchi orizzontali */
     width: 100%;
     height: 100vh;
     justify-content: center;
     align-items: center;
-            }
+}
 
-            #blocco-centrale {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0;
-            }
+#blocco-centrale, #blocco-superiore, #blocco-inferiore
+{
+    display: flex; /* altrimenti resterebbero tutti semplicemente in colonna */
+    align-items: center;
+}
 
-            #sinistra, #destra
-            {
-                z-index: 100;
-            }
+#sinistra, #destra
+{
+    z-index: 100;
+}
 
-            table {
-                border-collapse: collapse;
-                flex-shrink: 0;
-            }
+table
+{
+    border-collapse: collapse;
+}
 
-            #casa-blu {
-                background-color: blue;
-            }
+#casa-blu
+{
+    background-color: blue;
+}
 
-            #casa-rosso {
-                background-color: red;
-            }
+#casa-rosso
+{
+    background-color: red;
+}
 
-            #casa-verde {
-                background-color: green;
-            }
+#casa-verde
+{
+    background-color: green;
+}
 
-            #casa-giallo {
-                background-color: yellow;
-            }
+#casa-giallo
+{
+    background-color: yellow;
+}
 
-            #cammino ,#bianca{
-                background-color: #f2f2f2;
-            }
+#cammino
+{
+    background-color: #f2f2f2;
+}
 
-            td {
-                border: 1px solid black;
-                width: 4em;
-                height: 4em;
-                box-sizing: border-box;
-            }
+td
+{
+    border: 1px solid black;
+    width: 4em;
+    height: 4em;
+    box-sizing: border-box;  /**/
+}
 
 
             #su {
@@ -81,4 +87,5 @@ body
             /* Assicuriamo che le tabelle laterali abbiano la stessa larghezza */
             #sinistra, #destra, #su, #giu{
                 width: auto;
+                border: 0;
             }
