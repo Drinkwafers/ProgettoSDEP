@@ -5,8 +5,12 @@ body
 
 img
 {
-    width: inherit;
-    height: inherit;
+    width: 3.5em;
+}
+
+.cell-number
+{
+    display: none;
 }
 
 #tabellone
@@ -66,6 +70,7 @@ td
     width: 4em;
     height: 4em;
     box-sizing: border-box;  /* non conta il padding */
+    text-align: center;
 }
 
 #su
