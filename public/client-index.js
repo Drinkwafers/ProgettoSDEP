@@ -197,7 +197,7 @@ class LudoClient {
     }
 
     showGameBoard() {
-        window.location.href = 'restricted.html';
+        window.location.href = 'gioca.html';
     }
 
     updateGameDisplay() {
