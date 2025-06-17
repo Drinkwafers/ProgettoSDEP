@@ -276,7 +276,7 @@ app.get("/api/global-stats", authenticateToken, async (req, res) => {
 
         const totalPlayers = playersResult[0].totalPlayers;
         const totalGames = statsResult[0].totalGames || 0;
-        const avgWinRate = statsResult[0].avgWinRate || 0;
+        const avgWinRate = parseFloat(statsResult[0].avgWinRate) || 0;
 
         return res.json({
             success: true,
