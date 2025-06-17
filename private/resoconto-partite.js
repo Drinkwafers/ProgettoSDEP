@@ -1,25 +1,213 @@
-//tabella partite 
-//+--------------+------+------+-----+---------+-------+
-//| Field        | Type | Null | Key | Default | Extra |
-//+--------------+------+------+-----+---------+-------+
-//| id_giocatore | int  | NO   | MUL | NULL    |       |
-//| vinte        | int  | NO   |     | NULL    |       |
-//| giocate      | int  | NO   |     | NULL    |       |
-//+--------------+------+------+-----+---------+-------+
+window.onload = function() {
+    // Elementi del DOM
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    const error = document.getElementById('error');
+    const userName = document.getElementById('userName');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const errorMessage = document.getElementById('errorMessage');
 
+    // Elementi statistiche personali
+    const userWins = document.getElementById('userWins');
+    const userPlayed = document.getElementById('userPlayed');
+    const userWinRate = document.getElementById('userWinRate');
+    const userLosses = document.getElementById('userLosses');
 
-//tabella utenti
+    // Elementi classifica
+    const rankingBody = document.getElementById('rankingBody');
 
+    // Elementi statistiche globali
+    const totalPlayers = document.getElementById('totalPlayers');
+    const totalGames = document.getElementById('totalGames');
+    const avgWinRate = document.getElementById('avgWinRate');
 
-//+----------+--------------+------+-----+---------+----------------+
-//| Field    | Type         | Null | Key | Default | Extra          |
-//+----------+--------------+------+-----+---------+----------------+
-//| id       | int          | NO   | PRI | NULL    | auto_increment |
-//| nome     | varchar(100) | NO   |     | NULL    |                |
-//| email    | varchar(100) | NO   |     | NULL    |                |
-//| password | varchar(255) | NO   |     | NULL    |                |
-//+----------+--------------+------+-----+---------+----------------+
+    // Funzione per caricare i dati dell'utente
+    async function loadUserInfo() {
+        try {
+            const response = await fetch('/api/userinfo', {
+                method: 'GET',
+                credentials: 'include'
+            });
 
+            if (!response.ok) {
+                throw new Error('Non autorizzato');
+            }
 
+            const data = await response.json();
+            if (data.success) {
+                userName.textContent = data.nome;
+            }
+        } catch (err) {
+            console.error('Errore caricamento info utente:', err);
+            window.location.href = '/login.html';
+        }
+    }
 
-//mi serve fatta una pagina resoconto.html, resoconto.css, resoconto.js(per inviare le fetch al server) e le funzioni del server che già ho(server-login.js) che basandosi sui dati del db mi faccia il resoconto di ste partite solo se hai effettuato il login
+    // Funzione per caricare le statistiche personali
+    async function loadUserStats() {
+        try {
+            const response = await fetch('/api/user-stats', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento delle statistiche personali');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                const stats = data.stats;
+                userWins.textContent = stats.vinte || 0;
+                userPlayed.textContent = stats.giocate || 0;
+                userLosses.textContent = (stats.giocate - stats.vinte) || 0;
+                
+                const winRate = stats.giocate > 0 ? ((stats.vinte / stats.giocate) * 100).toFixed(1) : 0;
+                userWinRate.textContent = winRate + '%';
+            }
+        } catch (err) {
+            console.error('Errore caricamento statistiche utente:', err);
+            throw err;
+        }
+    }
+
+    // Funzione per caricare la classifica generale
+    async function loadRanking() {
+        try {
+            const response = await fetch('/api/ranking', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento della classifica');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                renderRanking(data.ranking, data.currentUserId);
+            }
+        } catch (err) {
+            console.error('Errore caricamento classifica:', err);
+            throw err;
+        }
+    }
+
+    // Funzione per renderizzare la classifica
+    function renderRanking(ranking, currentUserId) {
+        rankingBody.innerHTML = '';
+        
+        ranking.forEach((player, index) => {
+            const row = document.createElement('tr');
+            const position = index + 1;
+            const winRate = player.giocate > 0 ? ((player.vinte / player.giocate) * 100).toFixed(1) : 0;
+            
+            // Evidenzia l'utente corrente
+            if (player.id === currentUserId) {
+                row.classList.add('current-user');
+            }
+            
+            // Classe per le posizioni del podio
+            let positionClass = 'position';
+            if (position === 1) positionClass += ' gold';
+            else if (position === 2) positionClass += ' silver';
+            else if (position === 3) positionClass += ' bronze';
+            
+            row.innerHTML = `
+                <td><span class="${positionClass}">${position}</span></td>
+                <td>${player.nome}</td>
+                <td>${player.vinte}</td>
+                <td>${player.giocate}</td>
+                <td>${winRate}%</td>
+            `;
+            
+            rankingBody.appendChild(row);
+        });
+    }
+
+    // Funzione per caricare le statistiche globali
+    async function loadGlobalStats() {
+        try {
+            const response = await fetch('/api/global-stats', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento delle statistiche globali');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                const stats = data.stats;
+                totalPlayers.textContent = stats.totalPlayers || 0;
+                totalGames.textContent = stats.totalGames || 0;
+                avgWinRate.textContent = (stats.avgWinRate || 0).toFixed(1) + '%';
+            }
+        } catch (err) {
+            console.error('Errore caricamento statistiche globali:', err);
+            throw err;
+        }
+    }
+
+    // Funzione principale per caricare tutti i dati
+    async function loadAllData() {
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        error.style.display = 'none';
+
+        try {
+            // Carica tutti i dati in parallelo
+            await Promise.all([
+                loadUserInfo(),
+                loadUserStats(),
+                loadRanking(),
+                loadGlobalStats()
+            ]);
+
+            // Mostra il contenuto
+            loading.style.display = 'none';
+            content.style.display = 'block';
+            
+        } catch (err) {
+            console.error('Errore generale:', err);
+            showError(err.message);
+        }
+    }
+
+    // Funzione per mostrare gli errori
+    function showError(message) {
+        loading.style.display = 'none';
+        content.style.display = 'none';
+        error.style.display = 'block';
+        errorMessage.textContent = message;
+    }
+
+    // Funzione di logout
+    async function logout() {
+        try {
+            const response = await fetch('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                window.location.href = '/login.html';
+            } else {
+                alert('Errore durante il logout');
+            }
+        } catch (err) {
+            console.error('Errore logout:', err);
+            alert('Errore durante il logout');
+        }
+    }
+
+    // Event listeners
+    logoutBtn.addEventListener('click', logout);
+    retryBtn.addEventListener('click', loadAllData);
+
+    // Carica i dati all'avvio
+    loadAllData();
+};

@@ -184,6 +184,163 @@ app.get("/api/userinfo", authenticateToken, (req, res) => {
     });
 });
 
+// Aggiungere queste funzioni al file server-login.js prima di app.listen()
+
+// Endpoint per le statistiche personali dell'utente
+app.get("/api/user-stats", authenticateToken, async (req, res) => {
+    const userId = req.user.userId;
+
+    try {
+        const query = "SELECT vinte, giocate FROM partite WHERE id_giocatore = ?";
+        const [righe] = await pool.promise().execute(query, [userId]);
+
+        if (righe.length === 0) {
+            // Se l'utente non ha ancora partite, restituisci statistiche vuote
+            return res.json({
+                success: true,
+                stats: {
+                    vinte: 0,
+                    giocate: 0
+                }
+            });
+        }
+
+        const stats = righe[0];
+        
+        return res.json({
+            success: true,
+            stats: stats
+        });
+
+    } catch (err) {
+        console.error("Errore query statistiche utente:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Errore interno al server"
+        });
+    }
+});
+
+// Endpoint per la classifica generale
+app.get("/api/ranking", authenticateToken, async (req, res) => {
+    const currentUserId = req.user.userId;
+
+    try {
+        const query = `
+            SELECT u.id, u.nome, COALESCE(p.vinte, 0) as vinte, COALESCE(p.giocate, 0) as giocate,
+                   CASE 
+                       WHEN COALESCE(p.giocate, 0) = 0 THEN 0
+                       ELSE (COALESCE(p.vinte, 0) / COALESCE(p.giocate, 0)) * 100
+                   END as percentuale_vittorie
+            FROM utenti u
+            LEFT JOIN partite p ON u.id = p.id_giocatore
+            ORDER BY COALESCE(p.vinte, 0) DESC, percentuale_vittorie DESC, COALESCE(p.giocate, 0) DESC
+        `;
+        
+        const [righe] = await pool.promise().execute(query);
+
+        return res.json({
+            success: true,
+            ranking: righe,
+            currentUserId: currentUserId
+        });
+
+    } catch (err) {
+        console.error("Errore query classifica:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Errore interno al server"
+        });
+    }
+});
+
+// Endpoint per le statistiche globali
+app.get("/api/global-stats", authenticateToken, async (req, res) => {
+    try {
+        // Query per contare i giocatori totali
+        const playersQuery = "SELECT COUNT(*) as totalPlayers FROM utenti";
+        const [playersResult] = await pool.promise().execute(playersQuery);
+
+        // Query per le statistiche delle partite
+        const statsQuery = `
+            SELECT 
+                COUNT(*) as playersWithGames,
+                SUM(giocate) as totalGames,
+                AVG(CASE 
+                    WHEN giocate = 0 THEN 0
+                    ELSE (vinte / giocate) * 100
+                END) as avgWinRate
+            FROM partite
+        `;
+        const [statsResult] = await pool.promise().execute(statsQuery);
+
+        const totalPlayers = playersResult[0].totalPlayers;
+        const totalGames = statsResult[0].totalGames || 0;
+        const avgWinRate = statsResult[0].avgWinRate || 0;
+
+        return res.json({
+            success: true,
+            stats: {
+                totalPlayers: totalPlayers,
+                totalGames: totalGames,
+                avgWinRate: avgWinRate
+            }
+        });
+
+    } catch (err) {
+        console.error("Errore query statistiche globali:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Errore interno al server"
+        });
+    }
+});
+
+// Endpoint per aggiungere/aggiornare le statistiche di una partita (opzionale)
+app.post("/api/update-game-stats", authenticateToken, async (req, res) => {
+    const userId = req.user.userId;
+    const { won } = req.body; // true se ha vinto, false se ha perso
+
+    if (typeof won !== 'boolean') {
+        return res.status(400).json({
+            success: false,
+            message: "Il parametro 'won' deve essere un boolean"
+        });
+    }
+
+    try {
+        // Controlla se l'utente ha già un record nella tabella partite
+        const checkQuery = "SELECT vinte, giocate FROM partite WHERE id_giocatore = ?";
+        const [existingRows] = await pool.promise().execute(checkQuery, [userId]);
+
+        if (existingRows.length === 0) {
+            // Inserisci nuovo record
+            const insertQuery = "INSERT INTO partite (id_giocatore, vinte, giocate) VALUES (?, ?, 1)";
+            const vinte = won ? 1 : 0;
+            await pool.promise().execute(insertQuery, [userId, vinte]);
+        } else {
+            // Aggiorna record esistente
+            const currentStats = existingRows[0];
+            const newVinte = won ? currentStats.vinte + 1 : currentStats.vinte;
+            const newGiocate = currentStats.giocate + 1;
+            
+            const updateQuery = "UPDATE partite SET vinte = ?, giocate = ? WHERE id_giocatore = ?";
+            await pool.promise().execute(updateQuery, [newVinte, newGiocate, userId]);
+        }
+
+        return res.json({
+            success: true,
+            message: "Statistiche aggiornate con successo"
+        });
+
+    } catch (err) {
+        console.error("Errore aggiornamento statistiche partita:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Errore interno al server"
+        });
+    }
+});
 
 app.listen(PORT, () => {
     console.log("Server in ascolto su http://localhost:" + PORT);
