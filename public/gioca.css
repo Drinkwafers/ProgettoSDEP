@@ -3,71 +3,7 @@ body
     margin: 0; /* per poter usare 100vh */
     display: inline-flex;
     align-items: center;
-}
-
-img
-{
-    width: 3.5em;
-}
-
-.cell-number
-{
-    display: none;
-}
-
-#tabellone
-{
-    display: inline-flex; 
-    flex-direction: column; /* divido il tabellone in tre blocchi orizzontali */
-    width: 100%;
-    height: 100vh;
-    justify-content: center;
-    align-items: center;
-}
-
-#blocco-centrale, #blocco-superiore, #blocco-inferiore
-{
-    display: flex; /* altrimenti resterebbero tutti semplicemente in colonna */
-    align-items: center;
-}
-
-#sinistra, #destra
-{
-    z-index: 109;
-}
-
-table
-{
-    border-collapse: collapse;
-}
-
-#casa-blu
-{
-    background-color: blue;
-    /*z-index: 100;*/
-}
-
-#casa-rosso
-{
-    background-color: red;
-    z-index: 101;
-}
-
-#casa-verde
-{
-    background-color: green;
-    z-index: 102;
-}
-
-#casa-giallo
-{
-    background-color: yellow;
-    /*z-index: 103;*/
-}
-
-#cammino
-{
-    background-color: #f2f2f2;
+    
 }
 
 td
@@ -79,21 +15,139 @@ td
     text-align: center;
 }
 
-#su
+table
 {
-    transform: rotate(90deg);
+    border-collapse: collapse;
 }
 
-#giu
+#bianco
 {
-    transform: rotate(-90deg);
+    border: none;
+    padding: 0;
+}
+.destinazione-blu
+{
+    background-color: #27a7fe;
 }
 
-/*#sinistra {
-    /* Nessuna rotazione necessaria per il bottom
-}*/
-
-#destra
+.destinazione-rosso
 {
-    transform: rotate(180deg);
+    background-color: #ec2724;
+}
+
+.destinazione-verde
+{
+    background-color: #6fc639;
+}
+
+.destinazione-giallo
+{
+    background-color: #fbd12b;
+}
+
+#cammino, #freccia-blu, #freccia-rossa, #freccia-gialla, #freccia-verde
+{
+    background-color: #f2f2f2;
+}
+
+img
+{
+    width: 3.5em;
+}
+
+.base-blu
+{
+    box-shadow: 0 0 10px 3px gold;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse
+{
+    0% { box-shadow: 0 0 10px 3px gold; }
+    50% { box-shadow: 0 0 20px 5px gold; }
+    100% { box-shadow: 0 0 10px 3px gold; }
+}
+
+.linea-orizzontale, .linea-verticale
+{
+    border-bottom: 2px solid black;
+}
+
+.linea-verticale
+{
+    rotate: 90deg;
+}
+
+
+.griglia
+{
+    border: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 0;
+    padding: 0;
+}
+
+
+.freccia-orizzontale
+{
+    border-top: 2px solid black;
+}
+.freccia-orizzontale2
+{
+    border-top: 2px solid black;
+    rotate: 180deg;
+}
+.freccia-oriz
+{
+    border-top: 1px solid black;
+    rotate: 180deg;
+}
+.freccia-zontale
+{
+    border-top: 1px solid black;
+}
+.freccia-verticale
+{
+    border-top: 2px solid black;
+    rotate: -90deg;
+}
+.freccia-verticale2
+{
+    border-top: 2px solid black;
+    rotate: 90deg;
+}
+.freccia-vert
+{
+    border-top: 1px solid black;
+    rotate: 90deg;
+}
+.freccia-icale
+{
+    border-top: 1px solid black;
+    rotate: -90deg;
+}
+
+#freccia-blu
+{
+    background-image: url(immagini/freccia-blu.png);
+    background-size: cover;
+}
+
+#freccia-verde
+{
+    background-image: url(immagini/freccia-verde.png);
+    background-size: cover;
+}
+
+#freccia-rossa
+{
+    background-image: url(immagini/freccia-rossa.png);
+    background-size: cover;
+}
+
+#freccia-gialla
+{
+    background-image: url(immagini/freccia-gialla.png);
+    background-size: cover;
 }
