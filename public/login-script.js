@@ -38,7 +38,7 @@ window.onload = function () {
                 
                 // Attesa di 1 secondo prima del redirect per mostrare il messaggio
                 setTimeout(() => {
-                    window.location.href = "/private/restricted.html";
+                    window.location.href = "/private/resoconto-partite.html";
                 }, 1000);
             }
             else {

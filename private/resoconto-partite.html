@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resoconto Partite - Ese db</title>
+    <link rel="stylesheet" href="resoconto-partite.css">
+    <script src="resoconto-partite.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Resoconto Partite</h1>
+        <div class="user-info">
+            <span id="userName">Caricamento...</span>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Caricamento statistiche...</p>
+        </div>
+
+        <div class="content" id="content" style="display: none;">
+            <!-- Statistiche personali -->
+            <div class="stats-section">
+                <h2>Le tue Statistiche</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="userWins">0</div>
+                        <div class="stat-label">Partite Vinte</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="userPlayed">0</div>
+                        <div class="stat-label">Partite Giocate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="userWinRate">0%</div>
+                        <div class="stat-label">Percentuale Vittorie</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="userLosses">0</div>
+                        <div class="stat-label">Partite Perse</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classifica generale -->
+            <div class="ranking-section">
+                <h2>Classifica Generale</h2>
+                <div class="table-container">
+                    <table id="rankingTable">
+                        <thead>
+                            <tr>
+                                <th>Posizione</th>
+                                <th>Giocatore</th>
+                                <th>Vinte</th>
+                                <th>Giocate</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankingBody">
+                            <!-- Dati inseriti dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Statistiche globali -->
+            <div class="global-stats-section">
+                <h2>Statistiche Globali</h2>
+                <div class="global-stats-grid">
+                    <div class="global-stat-card">
+                        <div class="global-stat-number" id="totalPlayers">0</div>
+                        <div class="global-stat-label">Giocatori Totali</div>
+                    </div>
+                    <div class="global-stat-card">
+                        <div class="global-stat-number" id="totalGames">0</div>
+                        <div class="global-stat-label">Partite Totali</div>
+                    </div>
+                    <div class="global-stat-card">
+                        <div class="global-stat-number" id="avgWinRate">0%</div>
+                        <div class="global-stat-label">Media Vittorie</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="error" id="error" style="display: none;">
+            <h2>Errore</h2>
+            <p id="errorMessage">Si è verificato un errore nel caricamento dei dati.</p>
+            <button id="retryBtn" class="retry-btn">Riprova</button>
+        </div>
+    </div>
+
+    <div class="navigation">
+        <a href="/login.html" class="nav-link">Torna al Login</a>
+    </div>
+</body>
+</html>
+
+
+
+
