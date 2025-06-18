@@ -14,15 +14,11 @@ document.addEventListener('DOMContentLoaded', function()
     ];
 
     // Caselle di ingresso alle case al tabellone
-    const partenzaBlu = document.querySelector('.casella-1');
-    const partenzaRosso = document.querySelector('.casella-11');
-    const partenzaVerde = document.querySelector('.casella-21');
-    const partenzaGiallo = document.querySelector('.casella-31');
     const casellePartenza = {
-        'blu': 1,
-        'rosso': 11,
-        'verde': 21,
-        'giallo': 31
+        'blu': '.casella-1',
+        'rosso': '.casella-11',
+        'verde': '.casella-21',
+        'giallo': '.casella-31'
     };
 
     // Caselle di ingresso alle case finali
@@ -63,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function()
         }
         
         // Corretto: controlla se la pedina ha la classe base del colore corrente
-        if (pedina.classList.contains('base-' + turnoCorrente))
+        if (casella.className === 'base-' + turnoCorrente)
         {
             console.log('La pedina è nella base di partenza del turno corrente');
             entraPedina(casella, pedina); // Passa anche la pedina come parametro
@@ -78,26 +74,7 @@ document.addEventListener('DOMContentLoaded', function()
 
     function entraPedina(casella, pedina)
     {
-        // Determina la casella di partenza in base al colore del turno corrente
-        let casellaPartenza;
-        switch(turnoCorrente) {
-            case 'blu':
-                casellaPartenza = partenzaBlu;
-                break;
-            case 'rosso':
-                casellaPartenza = partenzaRosso;
-                break;
-            case 'verde':
-                casellaPartenza = partenzaVerde;
-                break;
-            case 'giallo':
-                casellaPartenza = partenzaGiallo;
-                break;
-            default:
-                console.error('Colore turno non valido');
-                return;
-        }
-        
+        const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
         if (casellaPartenza.querySelector('img'))
         {
             alert(`La casella di partenza ${turnoCorrente} ha già una pedina!`);
