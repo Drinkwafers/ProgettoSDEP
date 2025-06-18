@@ -1,9 +1,7 @@
 body
 {
-    margin: 0; /* per poter usare 100vh */
     display: inline-flex;
     align-items: center;
-    
 }
 
 td
@@ -45,7 +43,7 @@ table
     background-color: #fbd12b;
 }
 
-#cammino, #freccia-blu, #freccia-rossa, #freccia-gialla, #freccia-verde
+#cammino, #freccia-blu, #freccia-rosso, #freccia-giallo, #freccia-verde
 {
     background-color: #f2f2f2;
 }
@@ -140,14 +138,14 @@ img
     background-size: cover;
 }
 
-#freccia-rossa
+#freccia-rosso
 {
-    background-image: url(immagini/freccia-rossa.png);
+    background-image: url(immagini/freccia-rosso.png);
     background-size: cover;
 }
 
-#freccia-gialla
+#freccia-giallo
 {
-    background-image: url(immagini/freccia-gialla.png);
+    background-image: url(immagini/freccia-giallo.png);
     background-size: cover;
 }
