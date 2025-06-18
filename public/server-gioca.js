@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function()
         if (casella.className === 'base-' + turnoCorrente)
         {
             console.log('La pedina è nella base di partenza del turno corrente');
-            entraPedina(casella, pedina); // Passa anche la pedina come parametro
+            entraPedina(casella, pedina);
             return;
         }
 
@@ -97,8 +97,9 @@ document.addEventListener('DOMContentLoaded', function()
         numPosizione = classi[classi.length - 1];
         for (let i = 0; i < ultimoTiroDado; ultimoTiroDado--)
         {
-            if (numPosizione === caselleDestinazione[turnoCorrente])
+            if (numPosizione == caselleDestinazione[turnoCorrente])
             {
+                numPosizione = 1;
                 casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-1');
             } else
             {
