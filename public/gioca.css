@@ -25,22 +25,22 @@ table
     border: none;
     padding: 0;
 }
-.destinazione-blu
+#finale-blu
 {
     background-color: #27a7fe;
 }
 
-.destinazione-rosso
+#finale-rosso
 {
     background-color: #ec2724;
 }
 
-.destinazione-verde
+#finale-verde
 {
     background-color: #6fc639;
 }
 
-.destinazione-giallo
+#finale-giallo
 {
     background-color: #fbd12b;
 }
