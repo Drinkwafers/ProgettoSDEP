@@ -32,17 +32,14 @@ document.addEventListener('DOMContentLoaded', function()
     // Ordine dei turni
     const ordineTurni = ['blu', 'rosso', 'verde', 'giallo'];
 
-    let pedinePosizionate = 0;
+    pedinePosizionate = 0;
+    
     let turnoCorrente = 'blu';
     let dado = 0;
     let dadoTirato = false; // Flag per controllare se il dado è stato tirato nel turno corrente
-    let sei = false; // Flag per controllare se è stato tirato un 6 (dal paste.txt)
 
     listener();
     aggiornaIndicatoreTurno();
-    
-    // Aggiungi il listener per i controlli da tastiera
-    document.addEventListener('keydown', gestisciTastiera);
 
     function listener()
     {
@@ -53,59 +50,6 @@ document.addEventListener('DOMContentLoaded', function()
                 gestisciClick(this);
             });
         });
-    }
-
-    // Funzione per verificare se una pedina può muoversi (migliorata)
-    function puoMuoverePedina(casellaCorrente, pedina, numeroPosizioni) {
-        const colorePedina = ottieniColorePedina(pedina);
-        
-        // Se la pedina è in una casella di destinazione
-        if (casellaCorrente.className.includes('casella-destinazione')) {
-            const posizioneCorrente = parseInt(casellaCorrente.className.split('-').pop());
-            const nuovaPosizione = posizioneCorrente + numeroPosizioni;
-            
-            // Controlla se può muoversi nella zona di destinazione
-            if (nuovaPosizione <= 4) {
-                const casellaDestinazione = document.querySelector(`.casella-destinazione-${colorePedina}-${nuovaPosizione}`);
-                if (casellaDestinazione) {
-                    const pedinaDestinazione = casellaDestinazione.querySelector('img');
-                    return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
-                }
-            }
-            return false; // Non può muoversi oltre la zona di destinazione
-        }
-        
-        // Se la pedina è sul tabellone normale
-        let posizione = parseInt(casellaCorrente.className.split('-').pop());
-        let posizioneFinale = posizione + numeroPosizioni;
-        
-        // Gestisci il caso di superamento del tabellone (da 40 a 1)
-        if (posizioneFinale > 40) {
-            posizioneFinale = posizioneFinale - 40;
-        }
-        
-        // Controlla se la pedina entra nella zona di destinazione
-        if (posizione <= caselleDestinazione[colorePedina] && 
-            posizioneFinale > caselleDestinazione[colorePedina]) {
-            // La pedina entra nella zona di destinazione
-            const posizioneDestinazione = posizioneFinale - caselleDestinazione[colorePedina];
-            const casellaDestinazione = document.querySelector(`.casella-destinazione-${colorePedina}-${posizioneDestinazione}`);
-            
-            if (casellaDestinazione) {
-                const pedinaDestinazione = casellaDestinazione.querySelector('img');
-                return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
-            }
-        } else {
-            // Movimento normale sul tabellone
-            const casellaDestinazione = document.querySelector(`.casella-${posizioneFinale}`);
-            
-            if (casellaDestinazione) {
-                const pedinaDestinazione = casellaDestinazione.querySelector('img');
-                return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
-            }
-        }
-        
-        return true; // La pedina può muoversi
     }
 
     function gestisciClick(casella)
@@ -149,11 +93,10 @@ document.addEventListener('DOMContentLoaded', function()
                 return;
             }
             
-            if (sei === true)
+            if (dado === 6)
             {
                 entraPedina(casella, pedina);
                 // Con un 6 si tira di nuovo, quindi non cambiare turno
-                sei = false; // Reset del flag sei
                 dadoTirato = false;
                 dado = 0;
             }
@@ -171,12 +114,6 @@ document.addEventListener('DOMContentLoaded', function()
                 alert('Prima tira il dado!');
             } else
             {
-                // Controllo se la pedina può muoversi
-                if (!puoMuoverePedina(casella, pedina, dado)) {
-                    alert('Non puoi muovere questa pedina! La casella di destinazione è occupata da una tua pedina. Prova a muovere un\'altra pedina.');
-                    return;
-                }
-                
                 controllaPedina(casella, pedina);
             }
         }
@@ -195,9 +132,8 @@ document.addEventListener('DOMContentLoaded', function()
     async function controllaPedina(casella, pedina)
     {
         let classi = casella.className.split('-');
-        let numPosizione = parseInt(classi[classi.length - 1]);
-        
-        for (let i = 0; i < dado; i++) // Corretto: era dado-- che causava loop infinito
+        numPosizione = classi[classi.length - 1];
+        for (let i = 0; i < dado; dado--)
         {
             if (numPosizione == caselleDestinazione[turnoCorrente])
             {
@@ -209,15 +145,13 @@ document.addEventListener('DOMContentLoaded', function()
                 if (numPosizione === 41)
                     numPosizione = 1; // Torna all'inizio se supera 40
 
-                // Controlla se mangia solo sull'ultimo movimento
-                if (i === dado - 1)
-                    controllaMangia(casella, pedina, document.querySelector('.casella-' + numPosizione));
+                if (dado == 1)
+                    controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
 
                 if (casella.className.startsWith('casella-destinazione'))
                 {
-                    const nuovaPosizione = parseInt(casella.className.split('-').pop()) + 1;
-                    if (nuovaPosizione <= 4)
-                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + nuovaPosizione);
+                    if (numPosizione + dado <= 6 - pedinePosizionate)
+                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
                     else
                     {
                         alert('Non puoi muovere una pedina fuori dal tabellone!');
@@ -228,8 +162,7 @@ document.addEventListener('DOMContentLoaded', function()
                 } else
                     casella = muoviPedina(casella, pedina, numPosizione);
 
-                // Controlla vittoria
-                if (casella.className === `casella-destinazione-${turnoCorrente}-4`)
+                if (casella.className ==='casella-destinazione'+ turnoCorrente + '-' + (4 - pedinePosizionate))
                 {
                     console.log(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
                     alert(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
@@ -243,12 +176,11 @@ document.addEventListener('DOMContentLoaded', function()
 
         // Dopo aver mosso la pedina, passa al turno successivo
         // (a meno che non sia stato fatto un 6, nel qual caso si tira di nuovo)
-        if (sei === true) // Usa la variabile sei dal paste.txt
+        if (dado === 6)
         {
             alert('Hai fatto 6! Tira di nuovo!');
             dadoTirato = false;
             dado = 0;
-            sei = false; // Reset del flag per il prossimo turno
         }
         else
         {
@@ -360,10 +292,6 @@ document.addEventListener('DOMContentLoaded', function()
         dadoTirato = true;
         console.log('Dado tirato:', dado);
         
-        // Imposta il flag sei se il dado è 6 (dal paste.txt)
-        if (dado === 6)
-            sei = true;
-        
         // Mostra il risultato
         mostraRisultatoDado(dado);
         
@@ -404,112 +332,6 @@ document.addEventListener('DOMContentLoaded', function()
         }, 3000);
     }
 
-
-    // Funzione per trovare una pedina movibile casuale (CORRETTA)
-    function trovaPedinaCasuale()
-    {
-        // Prima controlla se ci sono pedine nella base che possono uscire (con dado = 6)
-        if (dado === 6)
-        {
-            const basi = document.querySelectorAll(`.base-${turnoCorrente}.turno-attivo`);
-            for (let base of basi)
-            {
-                const pedina = base.querySelector('img');
-                if (pedina) {
-                    const colorePedina = ottieniColorePedina(pedina);
-                    if (colorePedina === turnoCorrente) {
-                        const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
-                        // Controlla se la casella di partenza è libera o occupata da una pedina avversaria
-                        const pedinaNellaPartenza = casellaPartenza.querySelector('img');
-                        if (!pedinaNellaPartenza || ottieniColorePedina(pedinaNellaPartenza) !== turnoCorrente) {
-                            return { casella: base, pedina: pedina };
-                        }
-                    }
-                }
-            }
-        }
-    
-        // Cerca pedine sul tabellone che possono muoversi
-        const pedineDelTurno = [];
-        
-        // Controlla tutte le caselle del percorso principale
-        for (let i = 1; i <= 40; i++) {
-            const casella = document.querySelector(`.casella-${i}`);
-            if (casella) {
-                const pedina = casella.querySelector('img');
-                if (pedina && ottieniColorePedina(pedina) === turnoCorrente) {
-                    // Verifica se questa pedina può muoversi
-                    if (puoMuoverePedina(casella, pedina, dado)) {
-                        pedineDelTurno.push({ casella: casella, pedina: pedina });
-                    }
-                }
-            }
-        }
-        
-        // Controlla anche le caselle di destinazione
-        for (let i = 1; i <= 4; i++) {
-            const casella = document.querySelector(`.casella-destinazione-${turnoCorrente}-${i}`);
-            if (casella) {
-                const pedina = casella.querySelector('img');
-                if (pedina && ottieniColorePedina(pedina) === turnoCorrente) {
-                    // Per le caselle di destinazione, controlla se può muoversi verso il centro
-                    const nuovaPosizione = i + dado;
-                    if (nuovaPosizione <= 4) {
-                        const casellaDestinazione = document.querySelector(`.casella-destinazione-${turnoCorrente}-${nuovaPosizione}`);
-                        if (!casellaDestinazione || !casellaDestinazione.querySelector('img')) {
-                            pedineDelTurno.push({ casella: casella, pedina: pedina });
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Se ci sono pedine movibili, scegline una a caso
-        if (pedineDelTurno.length > 0) {
-            const indiceRandom = Math.floor(Math.random() * pedineDelTurno.length);
-            return pedineDelTurno[indiceRandom];
-        }
-        
-        return null; // Nessuna pedina può muoversi
-    }
-
-    // Funzione per muovere una pedina casuale
-    function muoviPedinaCasuale() {
-        if (!dadoTirato) {
-            alert('Prima devi tirare il dado!');
-            return;
-        }
-        
-        const pedinaDaMuovere = trovaPedinaCasuale();
-        
-        if (!pedinaDaMuovere) {
-            alert('Nessuna pedina può muoversi con questo dado!');
-            passaTurno();
-            return;
-        }
-        
-        console.log('Muovo pedina casuale:', pedinaDaMuovere);
-        
-        // Simula il click sulla pedina trovata
-        gestisciClick(pedinaDaMuovere.casella);
-    }
-
-    // Funzione per gestire i tasti premuti
-    function gestisciTastiera(evento) {
-        switch(evento.code) {
-            case 'Enter':
-                evento.preventDefault();
-                tiraDado();
-                break;
-                
-            case 'Space':
-                evento.preventDefault();
-                muoviPedinaCasuale();
-                break;
-        }
-    }
-
     // Rendi le funzioni accessibili globalmente
     window.tiraDado = tiraDado;
-    window.muoviPedinaCasuale = muoviPedinaCasuale;
 });

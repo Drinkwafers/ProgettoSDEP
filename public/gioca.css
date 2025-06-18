@@ -53,39 +53,16 @@ img
     width: 3.5em;
 }
 
-/* Effetto per il turno attivo */
-.turno-attivo
+.base-blu
 {
     box-shadow: 0 0 10px 3px gold;
     animation: pulse 2s infinite;
 }
-
 @keyframes pulse
 {
     0% { box-shadow: 0 0 10px 3px gold; }
     50% { box-shadow: 0 0 20px 5px gold; }
     100% { box-shadow: 0 0 10px 3px gold; }
-}
-
-/* Rimuovi l'effetto fisso dalla base blu */
-.base-blu
-{
-    background-color: #27a7fe;
-}
-
-.base-rosso
-{
-    background-color: #ec2724;
-}
-
-.base-verde
-{
-    background-color: #6fc639;
-}
-
-.base-giallo
-{
-    background-color: #fbd12b;
 }
 
 .linea-orizzontale, .linea-verticale
@@ -98,6 +75,7 @@ img
     rotate: 90deg;
 }
 
+
 .griglia
 {
     border: none;
@@ -107,6 +85,7 @@ img
     gap: 0;
     padding: 0;
 }
+
 
 .freccia-orizzontale
 {
