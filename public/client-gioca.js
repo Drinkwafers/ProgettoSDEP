@@ -108,7 +108,8 @@ document.addEventListener('DOMContentLoaded', function()
                 if (numPosizione === 41)
                     numPosizione = 1; // Torna all'inizio se supera 40
 
-                controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
+                if (dado == 1)
+                    controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
 
                 if (casella.className.startsWith('casella-destinazione'))
                 {
@@ -136,17 +137,32 @@ document.addEventListener('DOMContentLoaded', function()
         }
     }
 
-    function controllaMangia(casella, pedina, mangia)
+    function controllaMangia(casellaCorrente, pedina, casellaDestinazione)
     {
-        mangia = mangia.querySelector('img');
-        console.log('Mangerò qualcuno?' + mangia);
-        if (mangia && dado === 1)
+        const pedinaDaMangiare = casellaDestinazione.querySelector('img');
+        console.log('Pedina nella casella di destinazione:', pedinaDaMangiare);
+        
+        if (pedinaDaMangiare)
         {
-            nomeVittima = mangia.getAttribute('src').split('/').pop().replace("pedina-", "").replace(".png", "");
+            const nomeVittima = pedinaDaMangiare.getAttribute('src').split('/').pop().replace("pedina-", "").replace(".png", "");
             console.log('Pedina da mangiare:', nomeVittima);
-            if (nomeVittima != turnoCorrente)
+            
+            // Se la pedina nella casella di destinazione è di un colore diverso, la "mangia"
+            if (nomeVittima !== turnoCorrente)
             {
-                casella.removeChild(mangia);
+                console.log(`Pedina ${nomeVittima} mangiata da ${turnoCorrente}!`);
+                
+                // Rimuovi la pedina dalla casella di destinazione
+                casellaDestinazione.removeChild(pedinaDaMangiare);
+                
+                // Rimetti la pedina mangiata nella sua base
+                const baseVittima = document.querySelector(`.base-${nomeVittima}:not(:has(img))`);
+                if (baseVittima) {
+                    baseVittima.appendChild(pedinaDaMangiare);
+                }
+                
+                // Mostra un messaggio
+                alert(`Pedina ${nomeVittima} è stata mangiata e rimandata alla base!`);
             }
         }
     }
@@ -162,11 +178,13 @@ document.addEventListener('DOMContentLoaded', function()
     function entraPedina(casella, pedina)
     {
         const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
-        if (casellaPartenza.querySelector('img'))
+        if (casellaPartenza.querySelector('img') === "<img src=\"immagini/pedina-blu.png\">")
         {
             alert(`La casella di partenza ${turnoCorrente} ha già una pedina!`);
             return;
         }
+
+        controllaMangia(casella, pedina, casellaPartenza);
         
         // Muovi la pedina
         casella.removeChild(pedina);
