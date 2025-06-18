@@ -90,9 +90,28 @@ class LudoServer {
                 isAuthenticated: false
             });
             
-            ws.on('message', (data) => {
+            ws.on('message', async (data) => {
                 try {
                     const message = JSON.parse(data);
+
+                    // Gestione autenticazione
+                    if (message.type === 'auth' && message.token) {
+                        try {
+                            const payload = jwt.verify(message.token, JWT_SECRET);
+                            const client = this.clients.get(clientId);
+                            client.isAuthenticated = true;
+                            client.userInfo = {
+                                userId: payload.userId,
+                                userName: payload.userName
+                            };
+                            console.log(`Client ${clientId} autenticato come ${payload.userName}`);
+                        } catch (err) {
+                            // Token non valido, resta ospite
+                            console.log(`Token JWT non valido per client ${clientId}`);
+                        }
+                        return; // Non processare altro per questo messaggio
+                    }
+
                     this.handleClientMessage(clientId, message);
                 } catch (error) {
                     console.error('Errore parsing messaggio:', error);

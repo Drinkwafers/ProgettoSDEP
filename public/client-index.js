@@ -60,11 +60,13 @@ class LudoClient {
 
     initializeConnection() {
         try {
-            // Connessione WebSocket al server
             this.socket = new WebSocket('ws://localhost:3001');
-            
             this.socket.onopen = () => {
-                console.log('Connesso al server');
+                // Invia il token JWT appena la connessione è aperta
+                const token = this.getCookie('token');
+                if (token) {
+                    this.socket.send(JSON.stringify({ type: 'auth', token }));
+                }
                 this.isConnected = true;
                 this.showStatus('Connesso al server', 'success');
             };
@@ -419,6 +421,14 @@ class LudoClient {
                 statusDiv.classList.add('hidden');
             }, 5000);
         }
+    }
+
+    // Utility per leggere il cookie
+    getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
     }
 }
 

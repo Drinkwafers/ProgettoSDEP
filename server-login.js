@@ -144,7 +144,7 @@ app.post("/api/login", async (req, res) => {
 
         // Imposto il cookie
         res.cookie("token", token, {
-            httpOnly: true,
+            httpOnly: false, // <-- ORA il cookie è leggibile da JS
             secure: true,
             maxAge: 3600000,
             sameSite: "Strict"
