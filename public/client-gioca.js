@@ -29,12 +29,17 @@ document.addEventListener('DOMContentLoaded', function()
         'giallo': 30
     };
 
-    pedinePosizionateBlu = 0;
+    // Ordine dei turni
+    const ordineTurni = ['blu', 'rosso', 'verde', 'giallo'];
+
+    pedinePosizionate = 0;
     
     let turnoCorrente = 'blu';
     let dado = 0;
+    let dadoTirato = false; // Flag per controllare se il dado è stato tirato nel turno corrente
 
     listener();
+    aggiornaIndicatoreTurno();
 
     function listener()
     {
@@ -45,7 +50,6 @@ document.addEventListener('DOMContentLoaded', function()
                 gestisciClick(this);
             });
         });
-        /* aggiornaIndicatoreTurno(); */
     }
 
     function gestisciClick(casella)
@@ -60,40 +64,73 @@ document.addEventListener('DOMContentLoaded', function()
             return;
         }
 
-        if (casella.className === 'base-' + turnoCorrente)
+        // Ottieni il colore della pedina dalla sua immagine
+        const colorePedina = ottieniColorePedina(pedina);
+        console.log('Colore pedina:', colorePedina, 'Turno corrente:', turnoCorrente);
+
+        // Controlla se è il turno del giocatore corretto
+        if (colorePedina !== turnoCorrente)
         {
-            console.log('La pedina è nella base di partenza del turno corrente');
-            entraPedina(casella, pedina);
+            alert(`Non è il tuo turno! È il turno del giocatore ${turnoCorrente.toUpperCase()}`);
             return;
         }
 
+        if (casella.className === 'base-' + turnoCorrente + ' turno-attivo')
+        {
+            console.log('La pedina è nella base di partenza del turno corrente');
+
+            if (pedinePosizionate < 4)
+            {
+                entraPedina(casella, pedina);
+                console.log(`Pedina entrata nella base di partenza. Pedine posizionate: ${pedinePosizionate}`);
+                return;
+            }
+            
+            // Per uscire dalla base serve un 6
+            if (!dadoTirato)
+            {
+                alert('Prima tira il dado!');
+                return;
+            }
+            
+            if (dado === 6)
+            {
+                entraPedina(casella, pedina);
+                // Con un 6 si tira di nuovo, quindi non cambiare turno
+                dadoTirato = false;
+                dado = 0;
+            }
+            else
+            {
+                alert('Serve un 6 per uscire dalla base!');
+            }
+            return;
+        }
 
         if (casella.className.startsWith('casella-'))
         {
-            if (dado === 0)
+            if (!dadoTirato)
             {
                 alert('Prima tira il dado!');
             } else
             {
                 controllaPedina(casella, pedina);
-                
             }
         }
     }
 
+    function ottieniColorePedina(pedina)
+    {
+        const src = pedina.getAttribute('src');
+        if (src.includes('pedina-blu')) return 'blu';
+        if (src.includes('pedina-rosso')) return 'rosso';
+        if (src.includes('pedina-verde')) return 'verde';
+        if (src.includes('pedina-giallo')) return 'giallo';
+        return null;
+    }
+
     async function controllaPedina(casella, pedina)
     {
-        /*numPosizione = (parseInt(casella.className.split('-')[1]) + dado);
-        if (numPosizione < 40)
-        {
-            if (numPosizione > 40)
-                numPosizione = numPosizione - 40;
-            const nuovaPosizione = document.querySelector('.casella-' + numPosizione);
-            casella.removeChild(pedina);
-            nuovaPosizione.appendChild(pedina);
-            return;
-        }*/
-
         let classi = casella.className.split('-');
         numPosizione = classi[classi.length - 1];
         for (let i = 0; i < dado; dado--)
@@ -113,18 +150,19 @@ document.addEventListener('DOMContentLoaded', function()
 
                 if (casella.className.startsWith('casella-destinazione'))
                 {
-                    if (numPosizione + dado <= 6 - pedinePosizionateBlu)
+                    if (numPosizione + dado <= 6 - pedinePosizionate)
                         casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
                     else
                     {
                         alert('Non puoi muovere una pedina fuori dal tabellone!');
                         console.log(numPosizione, dado);
+                        passaTurno();
                         return;
                     }
                 } else
                     casella = muoviPedina(casella, pedina, numPosizione);
 
-                if (casella.className ==='casella-destinazione'+ turnoCorrente + '-' + (4 - pedinePosizionateBlu))
+                if (casella.className ==='casella-destinazione'+ turnoCorrente + '-' + (4 - pedinePosizionate))
                 {
                     console.log(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
                     alert(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
@@ -134,6 +172,19 @@ document.addEventListener('DOMContentLoaded', function()
             
             // Aspetta mezzo secondo prima del prossimo passo
             await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Dopo aver mosso la pedina, passa al turno successivo
+        // (a meno che non sia stato fatto un 6, nel qual caso si tira di nuovo)
+        if (dado === 6)
+        {
+            alert('Hai fatto 6! Tira di nuovo!');
+            dadoTirato = false;
+            dado = 0;
+        }
+        else
+        {
+            passaTurno();
         }
     }
 
@@ -163,6 +214,11 @@ document.addEventListener('DOMContentLoaded', function()
                 
                 // Mostra un messaggio
                 alert(`Pedina ${nomeVittima} è stata mangiata e rimandata alla base!`);
+                
+                // Quando si mangia una pedina, si tira di nuovo il dado
+                alert('Hai mangiato una pedina! Tira di nuovo!');
+                dadoTirato = false;
+                dado = 0;
             }
         }
     }
@@ -178,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function()
     function entraPedina(casella, pedina)
     {
         const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
-        if (casellaPartenza.querySelector('img') === "<img src=\"immagini/pedina-blu.png\">")
+        if (casellaPartenza.querySelector('img'))
         {
             alert(`La casella di partenza ${turnoCorrente} ha già una pedina!`);
             return;
@@ -191,11 +247,49 @@ document.addEventListener('DOMContentLoaded', function()
         casellaPartenza.appendChild(pedina);
         
         console.log(`Pedina ${turnoCorrente} spostata nella casella di partenza`);
+        pedinePosizionate++;
+    }
+
+    function passaTurno()
+    {
+        // Trova l'indice del turno corrente
+        const indiceCorrente = ordineTurni.indexOf(turnoCorrente);
+        
+        // Passa al turno successivo (con ciclo)
+        const prossimoIndice = (indiceCorrente + 1) % ordineTurni.length;
+        turnoCorrente = ordineTurni[prossimoIndice];
+        
+        // Reset del dado per il nuovo turno
+        dadoTirato = false;
+        dado = 0;
+        
+        console.log(`Turno passato a: ${turnoCorrente}`);
+        aggiornaIndicatoreTurno();
+    }
+
+    function aggiornaIndicatoreTurno()
+    {
+        // Rimuovi l'effetto pulse da tutte le basi
+        document.querySelectorAll('.base-blu, .base-rosso, .base-verde, .base-giallo').forEach(base => {
+            base.classList.remove('turno-attivo');
+        });
+        
+        // Aggiungi l'effetto pulse alle basi del turno corrente
+        document.querySelectorAll(`.base-${turnoCorrente}`).forEach(base => {
+            base.classList.add('turno-attivo');
+        });
     }
 
     function tiraDado()
     {
+        if (dadoTirato)
+        {
+            alert(`Hai già tirato il dado! È il turno di ${turnoCorrente.toUpperCase()}`);
+            return;
+        }
+
         dado = Math.floor(Math.random() * 6) + 1;
+        dadoTirato = true;
         console.log('Dado tirato:', dado);
         
         // Mostra il risultato
@@ -214,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function()
         
         const messaggio = document.createElement('div');
         messaggio.className = 'messaggio-dado';
-        messaggio.innerHTML = `Turno ${turnoCorrente}: Hai tirato ${risultato}`;
+        messaggio.innerHTML = `Turno ${turnoCorrente.toUpperCase()}: Hai tirato ${risultato}`;
         messaggio.style.cssText = `
             position: fixed;
             top: 20px;
