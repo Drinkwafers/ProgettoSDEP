@@ -404,22 +404,31 @@ document.addEventListener('DOMContentLoaded', function()
         }, 3000);
     }
 
-    // Funzione per trovare una pedina movibile casuale
-    function trovaPedinaCasuale() {
+
+    // Funzione per trovare una pedina movibile casuale (CORRETTA)
+    function trovaPedinaCasuale()
+    {
         // Prima controlla se ci sono pedine nella base che possono uscire (con dado = 6)
-        if (dado === 6) {
-            const pedineInBase = document.querySelectorAll(`.base-${turnoCorrente} img`);
-            for (let pedina of pedineInBase) {
-                const colorePedina = ottieniColorePedina(pedina);
-                if (colorePedina === turnoCorrente) {
-                    const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
-                    if (!casellaPartenza.querySelector('img')) {
-                        return { casella: pedina.parentElement, pedina: pedina };
+        if (dado === 6)
+        {
+            const basi = document.querySelectorAll(`.base-${turnoCorrente}.turno-attivo`);
+            for (let base of basi)
+            {
+                const pedina = base.querySelector('img');
+                if (pedina) {
+                    const colorePedina = ottieniColorePedina(pedina);
+                    if (colorePedina === turnoCorrente) {
+                        const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
+                        // Controlla se la casella di partenza è libera o occupata da una pedina avversaria
+                        const pedinaNellaPartenza = casellaPartenza.querySelector('img');
+                        if (!pedinaNellaPartenza || ottieniColorePedina(pedinaNellaPartenza) !== turnoCorrente) {
+                            return { casella: base, pedina: pedina };
+                        }
                     }
                 }
             }
         }
-        
+    
         // Cerca pedine sul tabellone che possono muoversi
         const pedineDelTurno = [];
         
