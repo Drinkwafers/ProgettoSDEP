@@ -32,16 +32,16 @@ document.addEventListener('DOMContentLoaded', function()
     // Ordine dei turni
     const ordineTurni = ['blu', 'rosso', 'verde', 'giallo'];
 
-    pedinePosizionate = 0;
-    
+    let pedinePosizionate = 0;
     let turnoCorrente = 'blu';
     let dado = 0;
     let dadoTirato = false; // Flag per controllare se il dado è stato tirato nel turno corrente
+    let sei = false; // Flag per controllare se è stato tirato un 6 (dal paste.txt)
 
     listener();
     aggiornaIndicatoreTurno();
     
-    // NUOVO: Aggiungi il listener per i controlli da tastiera
+    // Aggiungi il listener per i controlli da tastiera
     document.addEventListener('keydown', gestisciTastiera);
 
     function listener()
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function()
         });
     }
 
-    // NUOVO: Funzione per verificare se una pedina può muoversi
+    // Funzione per verificare se una pedina può muoversi (migliorata)
     function puoMuoverePedina(casellaCorrente, pedina, numeroPosizioni) {
         const colorePedina = ottieniColorePedina(pedina);
         
@@ -149,10 +149,11 @@ document.addEventListener('DOMContentLoaded', function()
                 return;
             }
             
-            if (dado === 6)
+            if (sei === true)
             {
                 entraPedina(casella, pedina);
                 // Con un 6 si tira di nuovo, quindi non cambiare turno
+                sei = false; // Reset del flag sei
                 dadoTirato = false;
                 dado = 0;
             }
@@ -170,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function()
                 alert('Prima tira il dado!');
             } else
             {
-                // NUOVO: Controllo se la pedina può muoversi
+                // Controllo se la pedina può muoversi
                 if (!puoMuoverePedina(casella, pedina, dado)) {
                     alert('Non puoi muovere questa pedina! La casella di destinazione è occupata da una tua pedina. Prova a muovere un\'altra pedina.');
                     return;
@@ -194,8 +195,9 @@ document.addEventListener('DOMContentLoaded', function()
     async function controllaPedina(casella, pedina)
     {
         let classi = casella.className.split('-');
-        numPosizione = classi[classi.length - 1];
-        for (let i = 0; i < dado; dado--)
+        let numPosizione = parseInt(classi[classi.length - 1]);
+        
+        for (let i = 0; i < dado; i++) // Corretto: era dado-- che causava loop infinito
         {
             if (numPosizione == caselleDestinazione[turnoCorrente])
             {
@@ -207,13 +209,15 @@ document.addEventListener('DOMContentLoaded', function()
                 if (numPosizione === 41)
                     numPosizione = 1; // Torna all'inizio se supera 40
 
-                if (dado == 1)
-                    controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
+                // Controlla se mangia solo sull'ultimo movimento
+                if (i === dado - 1)
+                    controllaMangia(casella, pedina, document.querySelector('.casella-' + numPosizione));
 
                 if (casella.className.startsWith('casella-destinazione'))
                 {
-                    if (numPosizione + dado <= 6 - pedinePosizionate)
-                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
+                    const nuovaPosizione = parseInt(casella.className.split('-').pop()) + 1;
+                    if (nuovaPosizione <= 4)
+                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + nuovaPosizione);
                     else
                     {
                         alert('Non puoi muovere una pedina fuori dal tabellone!');
@@ -224,7 +228,8 @@ document.addEventListener('DOMContentLoaded', function()
                 } else
                     casella = muoviPedina(casella, pedina, numPosizione);
 
-                if (casella.className ==='casella-destinazione'+ turnoCorrente + '-' + (4 - pedinePosizionate))
+                // Controlla vittoria
+                if (casella.className === `casella-destinazione-${turnoCorrente}-4`)
                 {
                     console.log(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
                     alert(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
@@ -238,11 +243,12 @@ document.addEventListener('DOMContentLoaded', function()
 
         // Dopo aver mosso la pedina, passa al turno successivo
         // (a meno che non sia stato fatto un 6, nel qual caso si tira di nuovo)
-        if (dado === 6)
+        if (sei === true) // Usa la variabile sei dal paste.txt
         {
             alert('Hai fatto 6! Tira di nuovo!');
             dadoTirato = false;
             dado = 0;
+            sei = false; // Reset del flag per il prossimo turno
         }
         else
         {
@@ -354,6 +360,10 @@ document.addEventListener('DOMContentLoaded', function()
         dadoTirato = true;
         console.log('Dado tirato:', dado);
         
+        // Imposta il flag sei se il dado è 6 (dal paste.txt)
+        if (dado === 6)
+            sei = true;
+        
         // Mostra il risultato
         mostraRisultatoDado(dado);
         
@@ -394,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function()
         }, 3000);
     }
 
-    // NUOVO: Funzione per trovare una pedina movibile casuale
+    // Funzione per trovare una pedina movibile casuale
     function trovaPedinaCasuale() {
         // Prima controlla se ci sono pedine nella base che possono uscire (con dado = 6)
         if (dado === 6) {
@@ -454,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function()
         return null; // Nessuna pedina può muoversi
     }
 
-    // NUOVO: Funzione per muovere una pedina casuale
+    // Funzione per muovere una pedina casuale
     function muoviPedinaCasuale() {
         if (!dadoTirato) {
             alert('Prima devi tirare il dado!');
@@ -475,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function()
         gestisciClick(pedinaDaMuovere.casella);
     }
 
-    // NUOVO: Funzione per gestire i tasti premuti
+    // Funzione per gestire i tasti premuti
     function gestisciTastiera(evento) {
         switch(evento.code) {
             case 'Enter':
