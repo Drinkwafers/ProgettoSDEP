@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function()
     pedinePosizionateBlu = 0;
     
     let turnoCorrente = 'blu';
-    let ultimoTiroDado = 0;
+    let dado = 0;
 
     listener();
 
@@ -70,19 +70,20 @@ document.addEventListener('DOMContentLoaded', function()
 
         if (casella.className.startsWith('casella-'))
         {
-            if (ultimoTiroDado === 0)
+            if (dado === 0)
             {
                 alert('Prima tira il dado!');
             } else
             {
                 controllaPedina(casella, pedina);
+                
             }
         }
     }
 
     async function controllaPedina(casella, pedina)
     {
-        numPosizione = (parseInt(casella.className.split('-')[1]) + ultimoTiroDado);
+        /*numPosizione = (parseInt(casella.className.split('-')[1]) + dado);
         if (numPosizione < 40)
         {
             if (numPosizione > 40)
@@ -91,11 +92,11 @@ document.addEventListener('DOMContentLoaded', function()
             casella.removeChild(pedina);
             nuovaPosizione.appendChild(pedina);
             return;
-        }
+        }*/
 
         let classi = casella.className.split('-');
         numPosizione = classi[classi.length - 1];
-        for (let i = 0; i < ultimoTiroDado; ultimoTiroDado--)
+        for (let i = 0; i < dado; dado--)
         {
             if (numPosizione == caselleDestinazione[turnoCorrente])
             {
@@ -106,11 +107,19 @@ document.addEventListener('DOMContentLoaded', function()
                 numPosizione++;
                 if (numPosizione === 41)
                     numPosizione = 1; // Torna all'inizio se supera 40
-                console.log(`Muovo la pedina da ${casella.className} a ${'casella-' + numPosizione}`);
-                console.log(ultimoTiroDado)
+
+                controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
+
                 if (casella.className.startsWith('casella-destinazione'))
                 {
-                    casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
+                    if (numPosizione + dado <= 6 - pedinePosizionateBlu)
+                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
+                    else
+                    {
+                        alert('Non puoi muovere una pedina fuori dal tabellone!');
+                        console.log(numPosizione, dado);
+                        return;
+                    }
                 } else
                     casella = muoviPedina(casella, pedina, numPosizione);
 
@@ -124,6 +133,21 @@ document.addEventListener('DOMContentLoaded', function()
             
             // Aspetta mezzo secondo prima del prossimo passo
             await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+
+    function controllaMangia(casella, pedina, mangia)
+    {
+        mangia = mangia.querySelector('img');
+        console.log('Mangerò qualcuno?' + mangia);
+        if (mangia && dado === 1)
+        {
+            nomeVittima = mangia.getAttribute('src').split('/').pop().replace("pedina-", "").replace(".png", "");
+            console.log('Pedina da mangiare:', nomeVittima);
+            if (nomeVittima != turnoCorrente)
+            {
+                casella.removeChild(mangia);
+            }
         }
     }
 
@@ -153,13 +177,13 @@ document.addEventListener('DOMContentLoaded', function()
 
     function tiraDado()
     {
-        ultimoTiroDado = Math.floor(Math.random() * 6) + 1;
-        console.log('Dado tirato:', ultimoTiroDado);
+        dado = Math.floor(Math.random() * 6) + 1;
+        console.log('Dado tirato:', dado);
         
         // Mostra il risultato
-        mostraRisultatoDado(ultimoTiroDado);
+        mostraRisultatoDado(dado);
         
-        return ultimoTiroDado;
+        return dado;
     }
 
     function mostraRisultatoDado(risultato)
