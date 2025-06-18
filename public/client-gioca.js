@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', function()
 
     listener();
     aggiornaIndicatoreTurno();
+    
+    // NUOVO: Aggiungi il listener per i controlli da tastiera
+    document.addEventListener('keydown', gestisciTastiera);
 
     function listener()
     {
@@ -50,6 +53,59 @@ document.addEventListener('DOMContentLoaded', function()
                 gestisciClick(this);
             });
         });
+    }
+
+    // NUOVO: Funzione per verificare se una pedina può muoversi
+    function puoMuoverePedina(casellaCorrente, pedina, numeroPosizioni) {
+        const colorePedina = ottieniColorePedina(pedina);
+        
+        // Se la pedina è in una casella di destinazione
+        if (casellaCorrente.className.includes('casella-destinazione')) {
+            const posizioneCorrente = parseInt(casellaCorrente.className.split('-').pop());
+            const nuovaPosizione = posizioneCorrente + numeroPosizioni;
+            
+            // Controlla se può muoversi nella zona di destinazione
+            if (nuovaPosizione <= 4) {
+                const casellaDestinazione = document.querySelector(`.casella-destinazione-${colorePedina}-${nuovaPosizione}`);
+                if (casellaDestinazione) {
+                    const pedinaDestinazione = casellaDestinazione.querySelector('img');
+                    return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
+                }
+            }
+            return false; // Non può muoversi oltre la zona di destinazione
+        }
+        
+        // Se la pedina è sul tabellone normale
+        let posizione = parseInt(casellaCorrente.className.split('-').pop());
+        let posizioneFinale = posizione + numeroPosizioni;
+        
+        // Gestisci il caso di superamento del tabellone (da 40 a 1)
+        if (posizioneFinale > 40) {
+            posizioneFinale = posizioneFinale - 40;
+        }
+        
+        // Controlla se la pedina entra nella zona di destinazione
+        if (posizione <= caselleDestinazione[colorePedina] && 
+            posizioneFinale > caselleDestinazione[colorePedina]) {
+            // La pedina entra nella zona di destinazione
+            const posizioneDestinazione = posizioneFinale - caselleDestinazione[colorePedina];
+            const casellaDestinazione = document.querySelector(`.casella-destinazione-${colorePedina}-${posizioneDestinazione}`);
+            
+            if (casellaDestinazione) {
+                const pedinaDestinazione = casellaDestinazione.querySelector('img');
+                return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
+            }
+        } else {
+            // Movimento normale sul tabellone
+            const casellaDestinazione = document.querySelector(`.casella-${posizioneFinale}`);
+            
+            if (casellaDestinazione) {
+                const pedinaDestinazione = casellaDestinazione.querySelector('img');
+                return !(pedinaDestinazione && ottieniColorePedina(pedinaDestinazione) === colorePedina);
+            }
+        }
+        
+        return true; // La pedina può muoversi
     }
 
     function gestisciClick(casella)
@@ -114,6 +170,12 @@ document.addEventListener('DOMContentLoaded', function()
                 alert('Prima tira il dado!');
             } else
             {
+                // NUOVO: Controllo se la pedina può muoversi
+                if (!puoMuoverePedina(casella, pedina, dado)) {
+                    alert('Non puoi muovere questa pedina! La casella di destinazione è occupata da una tua pedina. Prova a muovere un\'altra pedina.');
+                    return;
+                }
+                
                 controllaPedina(casella, pedina);
             }
         }
@@ -332,6 +394,103 @@ document.addEventListener('DOMContentLoaded', function()
         }, 3000);
     }
 
+    // NUOVO: Funzione per trovare una pedina movibile casuale
+    function trovaPedinaCasuale() {
+        // Prima controlla se ci sono pedine nella base che possono uscire (con dado = 6)
+        if (dado === 6) {
+            const pedineInBase = document.querySelectorAll(`.base-${turnoCorrente} img`);
+            for (let pedina of pedineInBase) {
+                const colorePedina = ottieniColorePedina(pedina);
+                if (colorePedina === turnoCorrente) {
+                    const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
+                    if (!casellaPartenza.querySelector('img')) {
+                        return { casella: pedina.parentElement, pedina: pedina };
+                    }
+                }
+            }
+        }
+        
+        // Cerca pedine sul tabellone che possono muoversi
+        const pedineDelTurno = [];
+        
+        // Controlla tutte le caselle del percorso principale
+        for (let i = 1; i <= 40; i++) {
+            const casella = document.querySelector(`.casella-${i}`);
+            if (casella) {
+                const pedina = casella.querySelector('img');
+                if (pedina && ottieniColorePedina(pedina) === turnoCorrente) {
+                    // Verifica se questa pedina può muoversi
+                    if (puoMuoverePedina(casella, pedina, dado)) {
+                        pedineDelTurno.push({ casella: casella, pedina: pedina });
+                    }
+                }
+            }
+        }
+        
+        // Controlla anche le caselle di destinazione
+        for (let i = 1; i <= 4; i++) {
+            const casella = document.querySelector(`.casella-destinazione-${turnoCorrente}-${i}`);
+            if (casella) {
+                const pedina = casella.querySelector('img');
+                if (pedina && ottieniColorePedina(pedina) === turnoCorrente) {
+                    // Per le caselle di destinazione, controlla se può muoversi verso il centro
+                    const nuovaPosizione = i + dado;
+                    if (nuovaPosizione <= 4) {
+                        const casellaDestinazione = document.querySelector(`.casella-destinazione-${turnoCorrente}-${nuovaPosizione}`);
+                        if (!casellaDestinazione || !casellaDestinazione.querySelector('img')) {
+                            pedineDelTurno.push({ casella: casella, pedina: pedina });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Se ci sono pedine movibili, scegline una a caso
+        if (pedineDelTurno.length > 0) {
+            const indiceRandom = Math.floor(Math.random() * pedineDelTurno.length);
+            return pedineDelTurno[indiceRandom];
+        }
+        
+        return null; // Nessuna pedina può muoversi
+    }
+
+    // NUOVO: Funzione per muovere una pedina casuale
+    function muoviPedinaCasuale() {
+        if (!dadoTirato) {
+            alert('Prima devi tirare il dado!');
+            return;
+        }
+        
+        const pedinaDaMuovere = trovaPedinaCasuale();
+        
+        if (!pedinaDaMuovere) {
+            alert('Nessuna pedina può muoversi con questo dado!');
+            passaTurno();
+            return;
+        }
+        
+        console.log('Muovo pedina casuale:', pedinaDaMuovere);
+        
+        // Simula il click sulla pedina trovata
+        gestisciClick(pedinaDaMuovere.casella);
+    }
+
+    // NUOVO: Funzione per gestire i tasti premuti
+    function gestisciTastiera(evento) {
+        switch(evento.code) {
+            case 'Enter':
+                evento.preventDefault();
+                tiraDado();
+                break;
+                
+            case 'Space':
+                evento.preventDefault();
+                muoviPedinaCasuale();
+                break;
+        }
+    }
+
     // Rendi le funzioni accessibili globalmente
     window.tiraDado = tiraDado;
+    window.muoviPedinaCasuale = muoviPedinaCasuale;
 });
