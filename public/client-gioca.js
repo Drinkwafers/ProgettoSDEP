@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function()
 
     listener();
     aggiornaIndicatoreTurno();
+    document.addEventListener('keydown', gestisciTastiera);
 
     function listener()
     {
@@ -330,6 +331,22 @@ document.addEventListener('DOMContentLoaded', function()
                 messaggio.remove();
             }
         }, 3000);
+    }
+
+    // Funzione per gestire i tasti premuti
+    function gestisciTastiera(evento)
+    {
+        switch(evento.code) {
+            case 'Enter':
+                evento.preventDefault();
+                tiraDado();
+                break;
+                
+            /*case 'Space':
+                evento.preventDefault();
+                muoviPedinaCasuale();
+                break;*/
+        }
     }
 
     // Rendi le funzioni accessibili globalmente
