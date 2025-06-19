@@ -157,9 +157,65 @@ wss.on('connection', (ws) => {
         }
       });
     }
+    else if (msg.type === 'start-game') {
+      const { gameId } = msg.data || {};
+      if (!gameId || !games[gameId]) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
+        return;
+      }
+
+      const game = games[gameId];
+
+      // Solo l'host può avviare la partita (host = primo playerId della partita)
+      if (game.host !== game.players[0].id) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Solo l\'host può avviare la partita' }));
+        return;
+      }
+
+      // Assegna i colori ai giocatori nell'ordine di ingresso
+      const colori = ['blu', 'rosso', 'verde', 'giallo'];
+      game.players.forEach((player, idx) => {
+        player.color = colori[idx];
+      });
+
+      game.status = 'in-progress';
+
+      // Notifica a tutti i giocatori con i dati necessari
+      game.players.forEach((player, idx) => {
+        const playerWs = playerSockets[player.id];
+        if (playerWs) {
+          playerWs.send(JSON.stringify({
+            type: 'game-started',
+            data: {
+              gameId,
+              playerId: player.id,
+              color: player.color,
+              gameState: game
+            }
+          }));
+        }
+      });
+    }
 
     // ...gestione altri tipi di messaggi...
   });
 });
 
 server.listen(PORT, () => console.log(`WS server listening on ${PORT}`));
+
+// Client-side code (da eseguire nel browser, ad esempio in un file separato)
+socket.onmessage = function(event) {
+  const msg = JSON.parse(event.data);
+
+  if (msg.type === 'game-started') {
+    // Salva dati utili (ad esempio in localStorage)
+    localStorage.setItem('gameId', msg.data.gameId);
+    localStorage.setItem('playerId', msg.data.playerId);
+    localStorage.setItem('color', msg.data.color);
+
+    // Reindirizza a gioca.html
+    window.location.href = 'gioca.html';
+  }
+
+  // ...gestione altri messaggi...
+};
