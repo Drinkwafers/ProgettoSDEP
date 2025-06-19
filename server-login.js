@@ -93,7 +93,7 @@ app.post("/api/register", async (req, res) => {
         const [result] = await pool.promise().execute(insertQuery, [nome, email, password]);
 
         return res.status(201).json({
-            success: true,
+            success: false,
             message: "Registrazione completata con successo"
         });
 
@@ -145,7 +145,7 @@ app.post("/api/login", async (req, res) => {
         // Imposto il cookie
         res.cookie("token", token, {
             httpOnly: false, // <-- ORA il cookie è leggibile da JS
-            secure: true,
+            secure: false,   // Cambiato da true a false per sviluppo locale
             maxAge: 3600000,
             sameSite: "Strict"
         });
@@ -180,7 +180,8 @@ app.post("/api/logout", authenticateToken, (req, res) => {
 app.get("/api/userinfo", authenticateToken, (req, res) => {
     res.json({
         success: true,
-        nome: req.user.userName
+        nome: req.user.userName,
+        userId: req.user.userId,
     });
 });
 
