@@ -147,7 +147,7 @@ app.post("/api/login", async (req, res) => {
             httpOnly: false, // <-- ORA il cookie è leggibile da JS
             secure: false,   // Cambiato da true a false per sviluppo locale
             maxAge: 3600000,
-            sameSite: "Strict"
+            // sameSite: "Strict"
         });
 
         return res.json({
