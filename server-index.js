@@ -256,102 +256,14 @@ wss.on('connection', (ws) => {
               gameId,
               playerId: player.id,
               color: player.color,
-              gameState: game,
-              turnoCorrente: game.turnoCorrente
+              gameState: game
             }
           }));
         }
       });
     }
-    else if (msg.type === 'leave-game') {
-      const { gameId, playerId } = msg.data || {};
-      if (!gameId || !games[gameId] || !playerId) {
-        return;
-      }
 
-      const game = games[gameId];
-      
-      // Rimuovi il giocatore dalla partita
-      game.players = game.players.filter(p => p.id !== playerId);
-      
-      // Rimuovi la connessione
-      delete playerSockets[playerId];
-
-      // Se non ci sono più giocatori, elimina la partita
-      if (game.players.length === 0) {
-        delete games[gameId];
-        return;
-      }
-
-      // Se l'host ha lasciato la partita, assegna il ruolo al primo giocatore rimasto
-      if (game.host === playerId && game.players.length > 0) {
-        game.host = game.players[0].id;
-      }
-
-      // Notifica a tutti i giocatori rimasti
-      const updateMessage = `Un giocatore ha lasciato la partita. Giocatori: ${game.players.length}/4`;
-      
-      game.players.forEach(player => {
-        const playerWs = playerSockets[player.id];
-        if (playerWs) {
-          playerWs.send(JSON.stringify({
-            type: 'game-updated',
-            data: { 
-              gameState: game,
-              message: updateMessage
-            }
-          }));
-        }
-      });
-    }
-  });
-
-  // Gestione disconnessione
-  ws.on('close', () => {
-    console.log('Connessione WebSocket chiusa');
-    // Trova il giocatore associato a questa connessione
-    const playerId = Object.keys(playerSockets).find(id => playerSockets[id] === ws);
-    if (playerId) {
-      // Trova la partita in cui è il giocatore
-      const gameId = Object.keys(games).find(id => 
-        games[id].players.some(p => p.id === playerId)
-      );
-      
-      if (gameId) {
-        const game = games[gameId];
-        
-        // Rimuovi il giocatore
-        game.players = game.players.filter(p => p.id !== playerId);
-        delete playerSockets[playerId];
-
-        // Se non ci sono più giocatori, elimina la partita
-        if (game.players.length === 0) {
-          delete games[gameId];
-          return;
-        }
-
-        // Se l'host si è disconnesso, assegna il ruolo al primo giocatore rimasto
-        if (game.host === playerId && game.players.length > 0) {
-          game.host = game.players[0].id;
-        }
-
-        // Notifica agli altri giocatori
-        const updateMessage = `Un giocatore si è disconnesso. Giocatori: ${game.players.length}/4`;
-        
-        game.players.forEach(player => {
-          const playerWs = playerSockets[player.id];
-          if (playerWs) {
-            playerWs.send(JSON.stringify({
-              type: 'game-updated',
-              data: { 
-                gameState: game,
-                message: updateMessage
-              }
-            }));
-          }
-        });
-      }
-    }
+    // ...gestione altri tipi di messaggi...
   });
 });
 
