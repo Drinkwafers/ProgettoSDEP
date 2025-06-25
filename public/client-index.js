@@ -316,7 +316,8 @@ class LudoClient {
     }
 
     showGameBoard() {
-        window.location.href = 'gioca.html';
+        // Passa gameId e playerId nell'URL
+        window.location.href = `gioca.html?gameId=${this.gameId}&playerId=${this.playerId}`;
     }
 
     updateGameDisplay() {
