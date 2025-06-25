@@ -8,7 +8,7 @@ const WebSocket = require('ws');
 
 const app = express();
 const PORT = process.env.PORT_WS || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta'; // Usa la stessa chiave del server di login
 
 app.use(cors({
   origin: 'http://localhost:3000',
@@ -27,10 +27,14 @@ server.on('upgrade', (request, socket, head) => {
   cookieParser()(request, null, () => {
     let user = null;
     try {
-      const token = request.cookies.access_token;
-      const payload = jwt.verify(token, JWT_SECRET);
-      user = { userId: payload.userId, userName: payload.userName };
-    } catch {
+      // Correggi: usa 'token' invece di 'access_token'
+      const token = request.cookies.token;
+      if (token) {
+        const payload = jwt.verify(token, JWT_SECRET);
+        user = { userId: payload.userId, userName: payload.userName };
+      }
+    } catch (error) {
+      console.log('Token non valido o assente:', error.message);
       user = null;
     }
     wss.handleUpgrade(request, socket, head, (ws) => {
@@ -41,10 +45,10 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (ws) => {
-  const clientInfo = {
+  console.log('Nuova connessione WebSocket:', {
     isAuthenticated: Boolean(ws.user),
-    userInfo: ws.user
-  };
+    user: ws.user
+  });
 
   ws.on('message', function incoming(message) {
     let msg;
@@ -55,11 +59,26 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    console.log('Messaggio ricevuto:', msg.type, msg.data);
+
     if (msg.type === 'create-game') {
-      const playerName = msg.data?.playerName?.trim();
-      if (!playerName) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Nome giocatore mancante' }));
-        return;
+      // Determina il nome del giocatore
+      let playerName;
+      let isAuthenticated = false;
+      
+      if (ws.user) {
+        // Utente autenticato - usa il nome dal JWT
+        playerName = ws.user.userName;
+        isAuthenticated = true;
+        console.log('Creazione partita - Utente autenticato:', playerName);
+      } else {
+        // Utente ospite - usa il nome fornito
+        playerName = msg.data?.playerName?.trim();
+        if (!playerName) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Nome giocatore mancante' }));
+          return;
+        }
+        console.log('Creazione partita - Utente ospite:', playerName);
       }
 
       const gameId = Math.random().toString(36).substr(2, 8);
@@ -70,7 +89,7 @@ wss.on('connection', (ws) => {
         players: [{
           id: playerId,
           name: playerName,
-          isAuthenticated: clientInfo.isAuthenticated
+          isAuthenticated: isAuthenticated
         }],
         host: playerId,
         status: 'waiting'
@@ -93,13 +112,29 @@ wss.on('connection', (ws) => {
       }));
     }
     else if (msg.type === 'join-game') {
-      const { gameId, playerName } = msg.data || {};
-      const finalPlayerName = clientInfo.isAuthenticated && clientInfo.userInfo?.userName
-        ? clientInfo.userInfo.userName
-        : (playerName ? playerName.trim() : '');
+      const { gameId } = msg.data || {};
+      
+      // Determina il nome del giocatore
+      let playerName;
+      let isAuthenticated = false;
+      
+      if (ws.user) {
+        // Utente autenticato - usa il nome dal JWT
+        playerName = ws.user.userName;
+        isAuthenticated = true;
+        console.log('Join partita - Utente autenticato:', playerName);
+      } else {
+        // Utente ospite - usa il nome fornito
+        playerName = msg.data?.playerName?.trim();
+        if (!playerName) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Nome giocatore mancante' }));
+          return;
+        }
+        console.log('Join partita - Utente ospite:', playerName);
+      }
 
-      if (!finalPlayerName || !gameId || !gameId.trim()) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Inserisci nome e ID partita' }));
+      if (!gameId || !gameId.trim()) {
+        ws.send(JSON.stringify({ type: 'error', message: 'ID partita mancante' }));
         return;
       }
 
@@ -117,7 +152,7 @@ wss.on('connection', (ws) => {
       }
 
       // Nome già presente
-      if (game.players.some(p => p.name === finalPlayerName)) {
+      if (game.players.some(p => p.name === playerName)) {
         ws.send(JSON.stringify({ type: 'error', message: 'Nome già presente nella partita' }));
         return;
       }
@@ -128,8 +163,8 @@ wss.on('connection', (ws) => {
       // Aggiungi il giocatore alla partita
       game.players.push({
         id: playerId,
-        name: finalPlayerName,
-        isAuthenticated: clientInfo.isAuthenticated
+        name: playerName,
+        isAuthenticated: isAuthenticated
       });
 
       // Salva la connessione
@@ -222,7 +257,7 @@ wss.on('connection', (ws) => {
               playerId: player.id,
               color: player.color,
               gameState: game,
-              turnoCorrente: game.turnoCorrente // <-- AGGIUNGI QUESTO
+              turnoCorrente: game.turnoCorrente
             }
           }));
         }
@@ -269,53 +304,54 @@ wss.on('connection', (ws) => {
         }
       });
     }
+  });
 
-    // Gestione disconnessione
-    ws.on('close', () => {
-      // Trova il giocatore associato a questa connessione
-      const playerId = Object.keys(playerSockets).find(id => playerSockets[id] === ws);
-      if (playerId) {
-        // Trova la partita in cui è il giocatore
-        const gameId = Object.keys(games).find(id => 
-          games[id].players.some(p => p.id === playerId)
-        );
+  // Gestione disconnessione
+  ws.on('close', () => {
+    console.log('Connessione WebSocket chiusa');
+    // Trova il giocatore associato a questa connessione
+    const playerId = Object.keys(playerSockets).find(id => playerSockets[id] === ws);
+    if (playerId) {
+      // Trova la partita in cui è il giocatore
+      const gameId = Object.keys(games).find(id => 
+        games[id].players.some(p => p.id === playerId)
+      );
+      
+      if (gameId) {
+        const game = games[gameId];
         
-        if (gameId) {
-          const game = games[gameId];
-          
-          // Rimuovi il giocatore
-          game.players = game.players.filter(p => p.id !== playerId);
-          delete playerSockets[playerId];
+        // Rimuovi il giocatore
+        game.players = game.players.filter(p => p.id !== playerId);
+        delete playerSockets[playerId];
 
-          // Se non ci sono più giocatori, elimina la partita
-          if (game.players.length === 0) {
-            delete games[gameId];
-            return;
-          }
-
-          // Se l'host si è disconnesso, assegna il ruolo al primo giocatore rimasto
-          if (game.host === playerId && game.players.length > 0) {
-            game.host = game.players[0].id;
-          }
-
-          // Notifica agli altri giocatori
-          const updateMessage = `Un giocatore si è disconnesso. Giocatori: ${game.players.length}/4`;
-          
-          game.players.forEach(player => {
-            const playerWs = playerSockets[player.id];
-            if (playerWs) {
-              playerWs.send(JSON.stringify({
-                type: 'game-updated',
-                data: { 
-                  gameState: game,
-                  message: updateMessage
-                }
-              }));
-            }
-          });
+        // Se non ci sono più giocatori, elimina la partita
+        if (game.players.length === 0) {
+          delete games[gameId];
+          return;
         }
+
+        // Se l'host si è disconnesso, assegna il ruolo al primo giocatore rimasto
+        if (game.host === playerId && game.players.length > 0) {
+          game.host = game.players[0].id;
+        }
+
+        // Notifica agli altri giocatori
+        const updateMessage = `Un giocatore si è disconnesso. Giocatori: ${game.players.length}/4`;
+        
+        game.players.forEach(player => {
+          const playerWs = playerSockets[player.id];
+          if (playerWs) {
+            playerWs.send(JSON.stringify({
+              type: 'game-updated',
+              data: { 
+                gameState: game,
+                message: updateMessage
+              }
+            }));
+          }
+        });
       }
-    });
+    }
   });
 });
 

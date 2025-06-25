@@ -11,7 +11,6 @@ class LudoClient {
         this.userInfo = null;
         
         this.checkAuthStatus();
-        this.initializeConnection();
     }
 
     async checkAuthStatus() {
@@ -26,13 +25,23 @@ class LudoClient {
                     this.isAuthenticated = true;
                     this.userInfo = data;
                     this.playerName = data.nome;
+                    console.log('Utente autenticato:', this.playerName);
                     this.updateUIForAuthenticatedUser();
+                } else {
+                    console.log('Utente non autenticato');
+                    this.isAuthenticated = false;
                 }
+            } else {
+                console.log('Utente non autenticato - response not ok');
+                this.isAuthenticated = false;
             }
         } catch (error) {
-            console.log('Utente non autenticato - modalità ospite');
+            console.log('Utente non autenticato - errore:', error);
             this.isAuthenticated = false;
         }
+        
+        // Inizializza la connessione WebSocket solo dopo aver verificato l'autenticazione
+        this.initializeConnection();
     }
 
     updateUIForAuthenticatedUser() {
@@ -61,12 +70,9 @@ class LudoClient {
     initializeConnection() {
         try {
             this.socket = new WebSocket('ws://localhost:3001');
+            
             this.socket.onopen = () => {
-                // Invia il token JWT appena la connessione è aperta
-                const token = this.getCookie('token');
-                if (token) {
-                    this.socket.send(JSON.stringify({ type: 'auth', token }));
-                }
+                console.log('Connessione WebSocket aperta');
                 this.isConnected = true;
                 this.showStatus('Connesso al server', 'success');
             };
@@ -127,46 +133,59 @@ class LudoClient {
 
     sendMessage(type, data = {}) {
         if (this.socket && this.isConnected) {
-            // Aggiungi informazioni di autenticazione al messaggio
-            const messageData = {
-                ...data,
-                isAuthenticated: this.isAuthenticated,
-                userInfo: this.isAuthenticated ? this.userInfo : null
-            };
-            
-            this.socket.send(JSON.stringify({ type, data: messageData }));
+            console.log('Invio messaggio:', type, data);
+            this.socket.send(JSON.stringify({ type, data }));
         } else {
             this.showStatus('Non connesso al server', 'error');
         }
     }
 
     createGame(playerName) {
-        // Se l'utente è autenticato, usa il nome dal login
-        const finalPlayerName = this.isAuthenticated ? this.playerName : playerName.trim();
+        console.log('Creazione partita - isAuthenticated:', this.isAuthenticated);
         
-        if (!finalPlayerName) {
-            this.showStatus('Inserisci un nome valido', 'error');
-            return;
+        // Se l'utente è autenticato, non serve il nome dall'input
+        if (this.isAuthenticated) {
+            console.log('Creazione partita con utente autenticato:', this.playerName);
+            this.sendMessage('create-game', {});
+        } else {
+            // Utente ospite - usa il nome fornito
+            const finalPlayerName = playerName?.trim();
+            if (!finalPlayerName) {
+                this.showStatus('Inserisci un nome valido', 'error');
+                return;
+            }
+            console.log('Creazione partita con utente ospite:', finalPlayerName);
+            this.playerName = finalPlayerName;
+            this.sendMessage('create-game', { playerName: this.playerName });
         }
-
-        this.playerName = finalPlayerName;
-        this.sendMessage('create-game', { playerName: this.playerName });
     }
 
     joinGame(playerName, gameId) {
-        // Se l'utente è autenticato, usa il nome dal login
-        const finalPlayerName = this.isAuthenticated ? this.playerName : playerName.trim();
+        console.log('Join partita - isAuthenticated:', this.isAuthenticated);
         
-        if (!finalPlayerName || !gameId.trim()) {
-            this.showStatus('Inserisci nome e ID partita', 'error');
+        if (!gameId?.trim()) {
+            this.showStatus('Inserisci l\'ID partita', 'error');
             return;
         }
 
-        this.playerName = finalPlayerName;
-        this.sendMessage('join-game', { 
-            playerName: this.playerName, 
-            gameId: gameId.trim() 
-        });
+        // Se l'utente è autenticato, non serve il nome dall'input
+        if (this.isAuthenticated) {
+            console.log('Join partita con utente autenticato:', this.playerName);
+            this.sendMessage('join-game', { gameId: gameId.trim() });
+        } else {
+            // Utente ospite - usa il nome fornito
+            const finalPlayerName = playerName?.trim();
+            if (!finalPlayerName) {
+                this.showStatus('Inserisci un nome valido', 'error');
+                return;
+            }
+            console.log('Join partita con utente ospite:', finalPlayerName);
+            this.playerName = finalPlayerName;
+            this.sendMessage('join-game', { 
+                playerName: this.playerName, 
+                gameId: gameId.trim() 
+            });
+        }
     }
 
     leaveGame() {
