@@ -88,7 +88,7 @@ wss.on('connection', (ws) => {
           gameId,
           playerId,
           gameState,
-          message: 'Partita creata!'
+          message: 'Partita creata! Attendere altri 3 giocatori per iniziare.'
         }
       }));
     }
@@ -136,23 +136,34 @@ wss.on('connection', (ws) => {
       playerSockets[playerId] = ws;
 
       // Notifica il join solo a chi si è appena connesso
+      const joinMessage = game.players.length === 4 
+        ? 'Sei entrato nella partita! Tutti i giocatori sono pronti.' 
+        : `Sei entrato nella partita! Giocatori: ${game.players.length}/4`;
+
       ws.send(JSON.stringify({
         type: 'game-joined',
         data: {
           gameId,
           playerId,
           gameState: game,
-          message: 'Sei entrato nella partita!'
+          message: joinMessage
         }
       }));
 
       // Notifica a tutti i giocatori lo stato aggiornato
+      const updateMessage = game.players.length === 4 
+        ? 'Tutti i giocatori sono pronti! L\'host può avviare la partita.' 
+        : `Giocatori: ${game.players.length}/4 - Attendere altri giocatori`;
+
       game.players.forEach(player => {
         const playerWs = playerSockets[player.id];
-        if (playerWs && playerWs !== ws) {
+        if (playerWs) {
           playerWs.send(JSON.stringify({
             type: 'game-updated',
-            data: { gameState: game }
+            data: { 
+              gameState: game,
+              message: updateMessage
+            }
           }));
         }
       });
@@ -166,9 +177,26 @@ wss.on('connection', (ws) => {
 
       const game = games[gameId];
 
-      // Solo l'host può avviare la partita (host = primo playerId della partita)
-      if (game.host !== game.players[0].id) {
+      // Trova l'host nella lista dei giocatori
+      const hostPlayer = game.players.find(p => p.id === game.host);
+      if (!hostPlayer) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Host non trovato' }));
+        return;
+      }
+
+      // Verifica che il messaggio arrivi dall'host
+      const senderPlayer = game.players.find(p => playerSockets[p.id] === ws);
+      if (!senderPlayer || senderPlayer.id !== game.host) {
         ws.send(JSON.stringify({ type: 'error', message: 'Solo l\'host può avviare la partita' }));
+        return;
+      }
+
+      // CONTROLLO CRUCIALE: Verifica che ci siano esattamente 4 giocatori
+      if (game.players.length !== 4) {
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: `Servono esattamente 4 giocatori per iniziare! Attualmente: ${game.players.length}/4` 
+        }));
         return;
       }
 
@@ -180,6 +208,9 @@ wss.on('connection', (ws) => {
 
       game.status = 'in-progress';
 
+      // AGGIUNGI: imposta il turno corrente al primo giocatore
+      game.turnoCorrente = game.players[0].color;
+
       // Notifica a tutti i giocatori con i dati necessari
       game.players.forEach((player, idx) => {
         const playerWs = playerSockets[player.id];
@@ -190,32 +221,102 @@ wss.on('connection', (ws) => {
               gameId,
               playerId: player.id,
               color: player.color,
-              gameState: game
+              gameState: game,
+              turnoCorrente: game.turnoCorrente // <-- AGGIUNGI QUESTO
+            }
+          }));
+        }
+      });
+    }
+    else if (msg.type === 'leave-game') {
+      const { gameId, playerId } = msg.data || {};
+      if (!gameId || !games[gameId] || !playerId) {
+        return;
+      }
+
+      const game = games[gameId];
+      
+      // Rimuovi il giocatore dalla partita
+      game.players = game.players.filter(p => p.id !== playerId);
+      
+      // Rimuovi la connessione
+      delete playerSockets[playerId];
+
+      // Se non ci sono più giocatori, elimina la partita
+      if (game.players.length === 0) {
+        delete games[gameId];
+        return;
+      }
+
+      // Se l'host ha lasciato la partita, assegna il ruolo al primo giocatore rimasto
+      if (game.host === playerId && game.players.length > 0) {
+        game.host = game.players[0].id;
+      }
+
+      // Notifica a tutti i giocatori rimasti
+      const updateMessage = `Un giocatore ha lasciato la partita. Giocatori: ${game.players.length}/4`;
+      
+      game.players.forEach(player => {
+        const playerWs = playerSockets[player.id];
+        if (playerWs) {
+          playerWs.send(JSON.stringify({
+            type: 'game-updated',
+            data: { 
+              gameState: game,
+              message: updateMessage
             }
           }));
         }
       });
     }
 
-    // ...gestione altri tipi di messaggi...
+    // Gestione disconnessione
+    ws.on('close', () => {
+      // Trova il giocatore associato a questa connessione
+      const playerId = Object.keys(playerSockets).find(id => playerSockets[id] === ws);
+      if (playerId) {
+        // Trova la partita in cui è il giocatore
+        const gameId = Object.keys(games).find(id => 
+          games[id].players.some(p => p.id === playerId)
+        );
+        
+        if (gameId) {
+          const game = games[gameId];
+          
+          // Rimuovi il giocatore
+          game.players = game.players.filter(p => p.id !== playerId);
+          delete playerSockets[playerId];
+
+          // Se non ci sono più giocatori, elimina la partita
+          if (game.players.length === 0) {
+            delete games[gameId];
+            return;
+          }
+
+          // Se l'host si è disconnesso, assegna il ruolo al primo giocatore rimasto
+          if (game.host === playerId && game.players.length > 0) {
+            game.host = game.players[0].id;
+          }
+
+          // Notifica agli altri giocatori
+          const updateMessage = `Un giocatore si è disconnesso. Giocatori: ${game.players.length}/4`;
+          
+          game.players.forEach(player => {
+            const playerWs = playerSockets[player.id];
+            if (playerWs) {
+              playerWs.send(JSON.stringify({
+                type: 'game-updated',
+                data: { 
+                  gameState: game,
+                  message: updateMessage
+                }
+              }));
+            }
+          });
+        }
+      }
+    });
   });
 });
 
 server.listen(PORT, () => console.log(`WS server listening on ${PORT}`));
-
-// Client-side code (da eseguire nel browser, ad esempio in un file separato)
-socket.onmessage = function(event) {
-  const msg = JSON.parse(event.data);
-
-  if (msg.type === 'game-started') {
-    // Salva dati utili (ad esempio in localStorage)
-    localStorage.setItem('gameId', msg.data.gameId);
-    localStorage.setItem('playerId', msg.data.playerId);
-    localStorage.setItem('color', msg.data.color);
-
-    // Reindirizza a gioca.html
-    window.location.href = 'gioca.html';
-  }
-
-  // ...gestione altri messaggi...
-};

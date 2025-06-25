@@ -207,7 +207,7 @@ class LudoClient {
         
         this.showGameInfo();
         this.updateGameDisplay();
-        this.showStatus(`Partita creata! ID: ${this.gameId}`, 'success');
+        this.showStatus(`Partita creata! ID: ${this.gameId}. Servono 4 giocatori per iniziare.`, 'success');
     }
 
     handleGameJoined(data) {
@@ -217,12 +217,24 @@ class LudoClient {
         
         this.showGameInfo();
         this.updateGameDisplay();
-        this.showStatus('Sei entrato nella partita!', 'success');
+        
+        // Mostra messaggio personalizzato in base al numero di giocatori
+        const playerCount = this.gameState.players.length;
+        if (playerCount === 4) {
+            this.showStatus('Sei entrato nella partita! Tutti i giocatori sono pronti.', 'success');
+        } else {
+            this.showStatus(`Sei entrato nella partita! Giocatori: ${playerCount}/4`, 'success');
+        }
     }
 
     handleGameUpdated(data) {
         this.gameState = data.gameState;
         this.updateGameDisplay();
+        
+        // Mostra messaggio se fornito dal server
+        if (data.message) {
+            this.showStatus(data.message, 'info');
+        }
     }
 
     handleGameStarted(data) {
@@ -304,7 +316,8 @@ class LudoClient {
     }
 
     showGameBoard() {
-        window.location.href = 'gioca.html';
+        // Passa gameId e playerId nell'URL
+        window.location.href = `gioca.html?gameId=${this.gameId}&playerId=${this.playerId}`;
     }
 
     updateGameDisplay() {
@@ -312,7 +325,7 @@ class LudoClient {
 
         // Aggiorna info partita
         document.getElementById('currentGameId').textContent = this.gameId;
-        document.getElementById('playerCount').textContent = this.gameState.players.length;
+        document.getElementById('playerCount').textContent = `${this.gameState.players.length}/4`;
 
         // Aggiorna lista giocatori con indicatore di autenticazione
         const playersList = document.getElementById('playersList');
@@ -333,12 +346,34 @@ class LudoClient {
             playersList.appendChild(li);
         });
 
-        // Mostra bottone start se sei il creatore e ci sono abbastanza giocatori
+        // Mostra informazioni sui giocatori mancanti
+        const playersNeeded = 4 - this.gameState.players.length;
+        if (playersNeeded > 0) {
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'players-info';
+            infoDiv.innerHTML = `
+                <p><strong>Servono ancora ${playersNeeded} giocatori per iniziare</strong></p>
+                <p>Condividi l'ID partita: <code>${this.gameId}</code></p>
+            `;
+            playersList.appendChild(infoDiv);
+        }
+
+        // Mostra bottone start solo se:
+        // 1. Sei il creatore (host)
+        // 2. Ci sono esattamente 4 giocatori
+        // 3. La partita è in attesa
         const startBtn = document.getElementById('startGameBtn');
         if (this.gameState.host === this.playerId && 
-            this.gameState.players.length >= 2 && 
+            this.gameState.players.length === 4 && 
             this.gameState.status === 'waiting') {
             startBtn.style.display = 'block';
+            startBtn.disabled = false;
+            startBtn.textContent = 'Inizia Partita';
+        } else if (this.gameState.host === this.playerId && 
+                   this.gameState.players.length < 4) {
+            startBtn.style.display = 'block';
+            startBtn.disabled = true;
+            startBtn.textContent = `Aspetta altri giocatori (${this.gameState.players.length}/4)`;
         } else {
             startBtn.style.display = 'none';
         }

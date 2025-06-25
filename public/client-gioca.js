@@ -1,6 +1,13 @@
-// Attendi che il DOM sia completamente caricato
-document.addEventListener('DOMContentLoaded', function()
-{
+// client-gioca.js - Versione integrata con WebSocket
+document.addEventListener('DOMContentLoaded', function() {
+    // Variabili WebSocket e di gioco
+    let ws = null;
+    let gameId = null;
+    let playerId = null;
+    let playerColor = null;
+    let gameState = null;
+    let isMyTurn = false;
+
     // Mappa delle caselle del percorso principale in ordine (40 caselle totali)
     const percorsoGlobale = [
         '.casella-1', '.casella-2', '.casella-3', '.casella-4', '.casella-5',
@@ -29,99 +36,281 @@ document.addEventListener('DOMContentLoaded', function()
         'giallo': 30
     };
 
-    // Ordine dei turni
-    const ordineTurni = ['blu', 'rosso', 'verde', 'giallo'];
-
-    pedinePosizionate = 0;
-    
+    // Variabili di stato locale (sincronizzate con il server)
     let turnoCorrente = 'blu';
     let dado = 0;
-    let dadoTirato = false; // Flag per controllare se il dado è stato tirato nel turno corrente
+    let dadoTirato = false;
 
-    listener();
-    aggiornaIndicatoreTurno();
-    document.addEventListener('keydown', gestisciTastiera);
+    // Inizializza la connessione WebSocket
+    function connectWebSocket() {
+        // Ottieni i parametri dall'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        gameId = urlParams.get('gameId');
+        playerId = urlParams.get('playerId');
 
-    function listener()
-    {
+        if (!gameId || !playerId) {
+            alert('Parametri di gioco mancanti!');
+            window.location.href = '/';
+            return;
+        }
+
+        // Connetti al WebSocket
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.hostname}:3001`;
+        
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            console.log('Connesso al server WebSocket');
+        };
+
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            handleServerMessage(message);
+        };
+
+        ws.onclose = function() {
+            console.log('Connessione WebSocket chiusa');
+            alert('Connessione persa con il server!');
+        };
+
+        ws.onerror = function(error) {
+            console.error('Errore WebSocket:', error);
+        };
+    }
+
+    // Gestisce i messaggi dal server
+    function handleServerMessage(message) {
+        console.log('Messaggio ricevuto:', message);
+
+        switch (message.type) {
+            case 'game-started':
+                gameState = message.data.gameState;
+                playerColor = gameState.players.find(p => p.id === playerId)?.color;
+                // AGGIUNGI QUESTO:
+                turnoCorrente = message.data.turnoCorrente || gameState.players[0].color;
+                initializeLocalGame();
+                break;
+
+            case 'dice-thrown':
+                handleDiceThrown(message.data);
+                break;
+
+            case 'piece-moved':
+                handlePieceMoved(message.data);
+                break;
+
+            case 'game-updated':
+                gameState = message.data.gameState;
+                updateGameDisplay();
+                if (message.data.message) {
+                    showMessage(message.data.message);
+                }
+                break;
+
+            case 'error':
+                alert('Errore: ' + message.message);
+                break;
+        }
+    }
+
+    // Inizializza il gioco locale dopo aver ricevuto lo stato dal server
+    function initializeLocalGame() {
+        if (!gameState || !playerColor) return;
+
+        // Sincronizza lo stato locale con quello del server
+        turnoCorrente = gameState.gameData.turnoCorrente;
+        dadoTirato = gameState.gameData.dadoTirato;
+        dado = gameState.gameData.ultimoDado;
+        isMyTurn = (playerColor === turnoCorrente);
+
+        // Posiziona le pedine secondo lo stato del server
+        updatePiecePositions();
+        
+        // Aggiorna l'interfaccia
+        aggiornaIndicatoreTurno();
+        updateGameDisplay();
+        
+        listener();
+        document.addEventListener('keydown', gestisciTastiera);
+
+        showMessage(`Gioco iniziato! Sei il giocatore ${playerColor.toUpperCase()}`);
+    }
+
+    // Aggiorna le posizioni delle pedine basandosi sullo stato del server
+    function updatePiecePositions() {
+        if (!gameState) return;
+
+        // Pulisci tutte le pedine dal tabellone
+        document.querySelectorAll('img').forEach(img => {
+            if (img.src.includes('pedina-')) {
+                img.remove();
+            }
+        });
+
+        // Riposiziona le pedine secondo lo stato del server
+        gameState.players.forEach(player => {
+            player.pedine.forEach(pedina => {
+                const img = document.createElement('img');
+                img.src = `immagini/pedina-${player.color}.png`;
+                
+                let targetCell;
+                if (pedina.posizione === 'base') {
+                    // Pedina nella base
+                    targetCell = document.querySelector(`.base-${player.color}:not(:has(img))`);
+                } else if (pedina.posizione === 'destinazione') {
+                    // Pedina nella zona destinazione
+                    targetCell = document.querySelector(`.casella-destinazione-${player.color}-${pedina.casella}`);
+                } else if (pedina.posizione === 'percorso') {
+                    // Pedina sul percorso principale
+                    targetCell = document.querySelector(`.casella-${pedina.casella}`);
+                }
+
+                if (targetCell) {
+                    targetCell.appendChild(img);
+                }
+            });
+        });
+    }
+
+    // Gestisce il risultato del dado dal server
+    function handleDiceThrown(data) {
+        turnoCorrente = data.playerColor;
+        dado = data.diceResult;
+        dadoTirato = true;
+        isMyTurn = (playerColor === turnoCorrente);
+
+        mostraRisultatoDado(dado, data.playerColor);
+        aggiornaIndicatoreTurno();
+    }
+
+    // Gestisce il movimento di una pedina dal server
+    function handlePieceMoved(data) {
+        gameState = data.gameState;
+        updatePiecePositions();
+        
+        turnoCorrente = gameState.gameData.turnoCorrente;
+        dadoTirato = gameState.gameData.dadoTirato;
+        dado = gameState.gameData.ultimoDado;
+        isMyTurn = (playerColor === turnoCorrente);
+        
+        aggiornaIndicatoreTurno();
+    }
+
+    function listener() {
         // Aggiungi event listeners alle caselle del percorso
         document.querySelectorAll('td:not([id*="bianco"])').forEach(cell => {
-            cell.addEventListener('click', function()
-            {
+            cell.addEventListener('click', function() {
                 gestisciClick(this);
             });
         });
     }
 
-    function gestisciClick(casella)
-    {
+    function gestisciClick(casella) {
+        if (!isMyTurn) {
+            alert(`Non è il tuo turno! È il turno del giocatore ${turnoCorrente.toUpperCase()}`);
+            return;
+        }
+
         console.log('Casella cliccata:', casella.className);
 
         const pedina = casella.querySelector('img');
         
-        if (!pedina)
-        {
+        if (!pedina) {
             console.log('Nessuna pedina in questa casella');
             return;
         }
 
         // Ottieni il colore della pedina dalla sua immagine
         const colorePedina = ottieniColorePedina(pedina);
-        console.log('Colore pedina:', colorePedina, 'Turno corrente:', turnoCorrente);
+        console.log('Colore pedina:', colorePedina, 'Player color:', playerColor);
 
-        // Controlla se è il turno del giocatore corretto
-        if (colorePedina !== turnoCorrente)
-        {
-            alert(`Non è il tuo turno! È il turno del giocatore ${turnoCorrente.toUpperCase()}`);
+        // Controlla se è una pedina del giocatore
+        if (colorePedina !== playerColor) {
+            alert('Non puoi muovere le pedine degli altri giocatori!');
             return;
         }
 
-        if (casella.className === 'base-' + turnoCorrente + ' turno-attivo')
-        {
-            console.log('La pedina è nella base di partenza del turno corrente');
-
-            if (pedinePosizionate < 4)
-            {
-                entraPedina(casella, pedina);
-                console.log(`Pedina entrata nella base di partenza. Pedine posizionate: ${pedinePosizionate}`);
-                return;
-            }
-            
-            // Per uscire dalla base serve un 6
-            if (!dadoTirato)
-            {
-                alert('Prima tira il dado!');
-                return;
-            }
-            
-            if (dado === 6)
-            {
-                entraPedina(casella, pedina);
-                // Con un 6 si tira di nuovo, quindi non cambiare turno
-                dadoTirato = false;
-                dado = 0;
-            }
-            else
-            {
-                alert('Serve un 6 per uscire dalla base!');
-            }
-            return;
-        }
-
-        if (casella.className.startsWith('casella-'))
-        {
-            if (!dadoTirato)
-            {
-                alert('Prima tira il dado!');
-            } else
-            {
-                controllaPedina(casella, pedina);
-            }
+        // Logica per il movimento delle pedine (semplificata per WebSocket)
+        if (casella.className === 'base-' + playerColor + ' turno-attivo') {
+            handleBaseClick(casella, pedina);
+        } else if (casella.className.startsWith('casella-')) {
+            handleBoardClick(casella, pedina);
         }
     }
 
-    function ottieniColorePedina(pedina)
-    {
+    function handleBaseClick(casella, pedina) {
+        if (!dadoTirato) {
+            alert('Prima tira il dado!');
+            return;
+        }
+
+        // Trova l'ID della pedina (semplificata)
+        const pedinaNellaBase = Array.from(casella.parentElement.querySelectorAll('.base-' + playerColor)).indexOf(casella) + 1;
+        
+        // Invia la mossa al server
+        ws.send(JSON.stringify({
+            type: 'move-piece',
+            data: {
+                gameId: gameId,
+                playerId: playerId,
+                pieceId: pedinaNellaBase,
+                newPosition: 'percorso-1' // Entra nel percorso
+            }
+        }));
+    }
+
+    function handleBoardClick(casella, pedina) {
+        if (!dadoTirato) {
+            alert('Prima tira il dado!');
+            return;
+        }
+
+        // Trova l'ID della pedina e calcola la nuova posizione
+        const currentPosition = getCurrentPiecePosition(casella);
+        const newPosition = calculateNewPosition(currentPosition, dado);
+        
+        // Invia la mossa al server
+        ws.send(JSON.stringify({
+            type: 'move-piece',
+            data: {
+                gameId: gameId,
+                playerId: playerId,
+                pieceId: 1, // Semplificato - dovrebbe essere l'ID reale della pedina
+                newPosition: newPosition
+            }
+        }));
+    }
+
+    function getCurrentPiecePosition(casella) {
+        if (casella.className.startsWith('casella-destinazione')) {
+            const parts = casella.className.split('-');
+            return {
+                type: 'destinazione',
+                color: parts[2],
+                position: parseInt(parts[3])
+            };
+        } else if (casella.className.startsWith('casella-')) {
+            const parts = casella.className.split('-');
+            return {
+                type: 'percorso',
+                position: parseInt(parts[1])
+            };
+        }
+        return null;
+    }
+
+    function calculateNewPosition(currentPos, steps) {
+        // Logica semplificata - dovresti implementare la logica completa del movimento
+        if (currentPos.type === 'percorso') {
+            let newPos = currentPos.position + steps;
+            if (newPos > 40) newPos = newPos - 40;
+            return 'percorso-' + newPos;
+        }
+        return 'percorso-1';
+    }
+
+    function ottieniColorePedina(pedina) {
         const src = pedina.getAttribute('src');
         if (src.includes('pedina-blu')) return 'blu';
         if (src.includes('pedina-rosso')) return 'rosso';
@@ -130,177 +319,42 @@ document.addEventListener('DOMContentLoaded', function()
         return null;
     }
 
-    async function controllaPedina(casella, pedina)
-    {
-        let classi = casella.className.split('-');
-        numPosizione = classi[classi.length - 1];
-        for (let i = 0; i < dado; dado--)
-        {
-            if (numPosizione == caselleDestinazione[turnoCorrente])
-            {
-                numPosizione = 1;
-                casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-1');
-            } else
-            {
-                numPosizione++;
-                if (numPosizione === 41)
-                    numPosizione = 1; // Torna all'inizio se supera 40
-
-                if (dado == 1)
-                    controllaMangia (casella, pedina, document.querySelector('.casella-' + numPosizione));
-
-                if (casella.className.startsWith('casella-destinazione'))
-                {
-                    if (numPosizione + dado <= 6 - pedinePosizionate)
-                        casella = muoviPedina(casella, pedina, 'destinazione-' + turnoCorrente + '-' + numPosizione);
-                    else
-                    {
-                        alert('Non puoi muovere una pedina fuori dal tabellone!');
-                        console.log(numPosizione, dado);
-                        passaTurno();
-                        return;
-                    }
-                } else
-                    casella = muoviPedina(casella, pedina, numPosizione);
-
-                if (casella.className ==='casella-destinazione'+ turnoCorrente + '-' + (4 - pedinePosizionate))
-                {
-                    console.log(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
-                    alert(`Pedina ${turnoCorrente} raggiunta la destinazione!`);
-                    // Qui puoi aggiungere logica per gestire la vittoria
-                }
-            }
-            
-            // Aspetta mezzo secondo prima del prossimo passo
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-        // Dopo aver mosso la pedina, passa al turno successivo
-        // (a meno che non sia stato fatto un 6, nel qual caso si tira di nuovo)
-        if (dado === 6)
-        {
-            alert('Hai fatto 6! Tira di nuovo!');
-            dadoTirato = false;
-            dado = 0;
-        }
-        else
-        {
-            passaTurno();
-        }
-    }
-
-    function controllaMangia(casellaCorrente, pedina, casellaDestinazione)
-    {
-        const pedinaDaMangiare = casellaDestinazione.querySelector('img');
-        console.log('Pedina nella casella di destinazione:', pedinaDaMangiare);
-        
-        if (pedinaDaMangiare)
-        {
-            const nomeVittima = pedinaDaMangiare.getAttribute('src').split('/').pop().replace("pedina-", "").replace(".png", "");
-            console.log('Pedina da mangiare:', nomeVittima);
-            
-            // Se la pedina nella casella di destinazione è di un colore diverso, la "mangia"
-            if (nomeVittima !== turnoCorrente)
-            {
-                console.log(`Pedina ${nomeVittima} mangiata da ${turnoCorrente}!`);
-                
-                // Rimuovi la pedina dalla casella di destinazione
-                casellaDestinazione.removeChild(pedinaDaMangiare);
-                
-                // Rimetti la pedina mangiata nella sua base
-                const baseVittima = document.querySelector(`.base-${nomeVittima}:not(:has(img))`);
-                if (baseVittima) {
-                    baseVittima.appendChild(pedinaDaMangiare);
-                }
-                
-                // Mostra un messaggio
-                alert(`Pedina ${nomeVittima} è stata mangiata e rimandata alla base!`);
-                
-                // Quando si mangia una pedina, si tira di nuovo il dado
-                alert('Hai mangiato una pedina! Tira di nuovo!');
-                dadoTirato = false;
-                dado = 0;
-            }
-        }
-    }
-
-    function muoviPedina(casella, pedina, tipocasella)
-    {
-        const nuovaPosizione = document.querySelector('.casella-' + tipocasella);
-        casella.removeChild(pedina);
-        nuovaPosizione.appendChild(pedina);
-        return nuovaPosizione;
-    }
-
-    function entraPedina(casella, pedina)
-    {
-        const casellaPartenza = document.querySelector(casellePartenza[turnoCorrente]);
-        if (casellaPartenza.querySelector('img'))
-        {
-            alert(`La casella di partenza ${turnoCorrente} ha già una pedina!`);
-            return;
-        }
-
-        controllaMangia(casella, pedina, casellaPartenza);
-        
-        // Muovi la pedina
-        casella.removeChild(pedina);
-        casellaPartenza.appendChild(pedina);
-        
-        console.log(`Pedina ${turnoCorrente} spostata nella casella di partenza`);
-        pedinePosizionate++;
-    }
-
-    function passaTurno()
-    {
-        // Trova l'indice del turno corrente
-        const indiceCorrente = ordineTurni.indexOf(turnoCorrente);
-        
-        // Passa al turno successivo (con ciclo)
-        const prossimoIndice = (indiceCorrente + 1) % ordineTurni.length;
-        turnoCorrente = ordineTurni[prossimoIndice];
-        
-        // Reset del dado per il nuovo turno
-        dadoTirato = false;
-        dado = 0;
-        
-        console.log(`Turno passato a: ${turnoCorrente}`);
-        aggiornaIndicatoreTurno();
-    }
-
-    function aggiornaIndicatoreTurno()
-    {
+    function aggiornaIndicatoreTurno() {
         // Rimuovi l'effetto pulse da tutte le basi
         document.querySelectorAll('.base-blu, .base-rosso, .base-verde, .base-giallo').forEach(base => {
             base.classList.remove('turno-attivo');
         });
         
-        // Aggiungi l'effetto pulse alle basi del turno corrente
-        document.querySelectorAll(`.base-${turnoCorrente}`).forEach(base => {
-            base.classList.add('turno-attivo');
-        });
+        // Aggiungi l'effetto pulse alle basi del turno corrente solo se è il nostro turno
+        if (isMyTurn) {
+            document.querySelectorAll(`.base-${playerColor}`).forEach(base => {
+                base.classList.add('turno-attivo');
+            });
+        }
     }
 
-    function tiraDado()
-    {
-        if (dadoTirato)
-        {
-            alert(`Hai già tirato il dado! È il turno di ${turnoCorrente.toUpperCase()}`);
+    function tiraDado() {
+        if (!isMyTurn) {
+            alert(`Non è il tuo turno! È il turno del giocatore ${turnoCorrente.toUpperCase()}`);
             return;
         }
 
-        dado = Math.floor(Math.random() * 6) + 1;
-        dadoTirato = true;
-        console.log('Dado tirato:', dado);
-        
-        // Mostra il risultato
-        mostraRisultatoDado(dado);
-        
-        return dado;
+        if (dadoTirato) {
+            alert('Hai già tirato il dado!');
+            return;
+        }
+
+        // Invia la richiesta di tirare il dado al server
+        ws.send(JSON.stringify({
+            type: 'throw-dice',
+            data: {
+                gameId: gameId,
+                playerId: playerId
+            }
+        }));
     }
 
-    function mostraRisultatoDado(risultato)
-    {
+    function mostraRisultatoDado(risultato, coloreGiocatore) {
         // Rimuovi messaggi precedenti
         const vecchioMessaggio = document.querySelector('.messaggio-dado');
         if (vecchioMessaggio) {
@@ -309,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function()
         
         const messaggio = document.createElement('div');
         messaggio.className = 'messaggio-dado';
-        messaggio.innerHTML = `Turno ${turnoCorrente.toUpperCase()}: Hai tirato ${risultato}`;
+        messaggio.innerHTML = `Turno ${coloreGiocatore.toUpperCase()}: Ha tirato ${risultato}`;
         messaggio.style.cssText = `
             position: fixed;
             top: 20px;
@@ -317,12 +371,12 @@ document.addEventListener('DOMContentLoaded', function()
             transform: translateX(-50%);
             background: white;
             padding: 10px 20px;
-            border: 2px solid ${turnoCorrente};
+            border: 2px solid ${coloreGiocatore};
             border-radius: 5px;
             z-index: 1000;
             font-size: 18px;
             font-weight: bold;
-            color: ${turnoCorrente === 'giallo' ? 'black' : turnoCorrente};
+            color: ${coloreGiocatore === 'giallo' ? 'black' : coloreGiocatore};
         `;
         document.body.appendChild(messaggio);
         
@@ -333,21 +387,74 @@ document.addEventListener('DOMContentLoaded', function()
         }, 3000);
     }
 
+    function showMessage(text) {
+        const messaggio = document.createElement('div');
+        messaggio.className = 'messaggio-gioco';
+        messaggio.innerHTML = text;
+        messaggio.style.cssText = `
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f0f0f0;
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            z-index: 999;
+            font-size: 16px;
+        `;
+        document.body.appendChild(messaggio);
+        
+        setTimeout(() => {
+            if (messaggio.parentNode) {
+                messaggio.remove();
+            }
+        }, 3000);
+    }
+
+    function updateGameDisplay() {
+        if (!gameState) return;
+        
+        // Aggiorna informazioni del gioco
+        const infoDiv = document.getElementById('game-info') || createGameInfoDiv();
+        infoDiv.innerHTML = `
+            <div>Giocatore: ${playerColor ? playerColor.toUpperCase() : 'N/A'}</div>
+            <div>Turno: ${turnoCorrente.toUpperCase()}</div>
+            <div>Ultimo dado: ${dado || 'N/A'}</div>
+            <div>Giocatori: ${gameState.players.map(p => p.name + ' (' + p.color + ')').join(', ')}</div>
+        `;
+    }
+
+    function createGameInfoDiv() {
+        const infoDiv = document.createElement('div');
+        infoDiv.id = 'game-info';
+        infoDiv.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1000;
+        `;
+        document.body.appendChild(infoDiv);
+        return infoDiv;
+    }
+
     // Funzione per gestire i tasti premuti
-    function gestisciTastiera(evento)
-    {
+    function gestisciTastiera(evento) {
         switch(evento.code) {
             case 'Enter':
                 evento.preventDefault();
                 tiraDado();
                 break;
-                
-            /*case 'Space':
-                evento.preventDefault();
-                muoviPedinaCasuale();
-                break;*/
         }
     }
+
+    // Inizializza la connessione WebSocket
+    connectWebSocket();
 
     // Rendi le funzioni accessibili globalmente
     window.tiraDado = tiraDado;
