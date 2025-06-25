@@ -208,6 +208,9 @@ wss.on('connection', (ws) => {
 
       game.status = 'in-progress';
 
+      // AGGIUNGI: imposta il turno corrente al primo giocatore
+      game.turnoCorrente = game.players[0].color;
+
       // Notifica a tutti i giocatori con i dati necessari
       game.players.forEach((player, idx) => {
         const playerWs = playerSockets[player.id];
@@ -218,7 +221,8 @@ wss.on('connection', (ws) => {
               gameId,
               playerId: player.id,
               color: player.color,
-              gameState: game
+              gameState: game,
+              turnoCorrente: game.turnoCorrente // <-- AGGIUNGI QUESTO
             }
           }));
         }
