@@ -106,9 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Utility per verificare se l'utente è autenticato
 function checkAuthStatus() {
-    // Questa funzione può essere espansa per verificare lo stato di autenticazione
-    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-    return !!token;
+    return authManager.isAuthenticated();
 }
 
 // Aggiorna la visibilità dei link in base allo stato di autenticazione

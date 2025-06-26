@@ -11,7 +11,6 @@ app.use(cookieParser());
 
 app.use(express.static("public"));
 
-
 const JWT_SECRET = "mia_chiave_super_segreta";
 
 const pool = mysql.createPool({
@@ -24,8 +23,39 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
+// SOLUZIONE 1: Middleware per gestire token da SessionStorage
+function authenticateTokenFromHeader(req, res, next) {
+    // Prova prima con l'header Authorization
+    const authHeader = req.headers.authorization;
+    let token = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+    } else {
+        // Fallback ai cookie per compatibilità
+        token = req.cookies.token;
+    }
 
-// Middleware di autenticazione JWT
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: "Token di autenticazione mancante"
+        });
+    }
+
+    try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        req.user = payload;
+        next();
+    } catch (err) {
+        return res.status(401).json({
+            success: false,
+            message: "Token non valido"
+        });
+    }
+}
+
+// Middleware di autenticazione JWT originale (per le pagine)
 function authenticateToken(req, res, next) {
     const token = req.cookies.token;
 
@@ -42,16 +72,13 @@ function authenticateToken(req, res, next) {
     }
 }
 
-
 // Proteggo la cartella /private
 app.use("/private", authenticateToken, express.static("private"));
-
 
 // Endpoint registrazione
 app.post("/api/register", async (req, res) => {
     const { nome, email, password } = req.body;
 
-    // Validazione input
     if (!nome || !email || !password) {
         return res.status(400).json({
             success: false,
@@ -59,7 +86,6 @@ app.post("/api/register", async (req, res) => {
         });
     }
 
-    // Validazione lunghezza password
     if (password.length < 6) {
         return res.status(400).json({
             success: false,
@@ -67,7 +93,6 @@ app.post("/api/register", async (req, res) => {
         });
     }
 
-    // Validazione email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         return res.status(400).json({
@@ -77,23 +102,21 @@ app.post("/api/register", async (req, res) => {
     }
 
     try {
-        // Controllo se l'email esiste già
         const checkQuery = "SELECT id FROM utenti WHERE email = ?";
         const [existingUsers] = await pool.promise().execute(checkQuery, [email]);
 
         if (existingUsers.length > 0) {
-            return res.status(409).json({ // Conflict
+            return res.status(409).json({
                 success: false,
                 message: "Email già registrata"
             });
         }
 
-        // Inserimento nuovo utente
         const insertQuery = "INSERT INTO utenti (nome, email, password) VALUES (?, ?, ?)";
         const [result] = await pool.promise().execute(insertQuery, [nome, email, password]);
 
         return res.status(201).json({
-            success: false,
+            success: true,
             message: "Registrazione completata con successo"
         });
 
@@ -106,10 +129,9 @@ app.post("/api/register", async (req, res) => {
     }
 });
 
-
-// Endpoint login con controllo nel DB
+// SOLUZIONE 1: Login modificato per supportare sia cookie che header
 app.post("/api/login", async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, useSessionStorage } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({
@@ -124,7 +146,7 @@ app.post("/api/login", async (req, res) => {
         const [righe, colonne] = await pool.promise().execute(query, [email, password]);
 
         if (righe.length == 0) {
-            return res.status(401).json({ // Unauthorized
+            return res.status(401).json({
                 success: false,
                 message: "Credenziali non valide"
             });
@@ -142,32 +164,41 @@ app.post("/api/login", async (req, res) => {
             expiresIn: "1h"
         });
 
-        // Imposto il cookie
-        res.cookie("token", token, {
-            httpOnly: false, // <-- ORA il cookie è leggibile da JS
-            secure: false,   // Cambiato da true a false per sviluppo locale
-            maxAge: 3600000,
-            // sameSite: "Strict"
-        });
+        // Se useSessionStorage è true, invia solo il token senza impostare cookie
+        if (useSessionStorage) {
+            return res.json({
+                success: true,
+                message: "Login riuscito",
+                token: token,
+                user: {
+                    id: user.id,
+                    nome: user.nome
+                }
+            });
+        } else {
+            // Comportamento originale con cookie
+            res.cookie("token", token, {
+                httpOnly: false,
+                secure: false,
+                maxAge: 3600000,
+            });
 
-        return res.json({
-            success: true,
-            message: "Login riuscito"
-        });
+            return res.json({
+                success: true,
+                message: "Login riuscito"
+            });
+        }
 
-    }
-    catch (err) {
+    } catch (err) {
         console.error("Errore query DB:", err);
         return res.status(500).json({
             success: false,
             message: "Errore interno al server"
         });
     }
-
 });
 
-
-// Endpoit per il logout
+// Endpoint per il logout
 app.post("/api/logout", authenticateToken, (req, res) => {
     res.clearCookie("token");
     res.json({
@@ -176,8 +207,8 @@ app.post("/api/logout", authenticateToken, (req, res) => {
     });
 });
 
-
-app.get("/api/userinfo", authenticateToken, (req, res) => {
+// SOLUZIONE 1: Endpoint userinfo modificato per supportare header
+app.get("/api/userinfo", authenticateTokenFromHeader, (req, res) => {
     res.json({
         success: true,
         nome: req.user.userName,
@@ -185,10 +216,8 @@ app.get("/api/userinfo", authenticateToken, (req, res) => {
     });
 });
 
-// Aggiungere queste funzioni al file server-login.js prima di app.listen()
-
-// Endpoint per le statistiche personali dell'utente
-app.get("/api/user-stats", authenticateToken, async (req, res) => {
+// SOLUZIONE 1: Endpoint statistiche utente modificato
+app.get("/api/user-stats", authenticateTokenFromHeader, async (req, res) => {
     const userId = req.user.userId;
 
     try {
@@ -196,7 +225,6 @@ app.get("/api/user-stats", authenticateToken, async (req, res) => {
         const [righe] = await pool.promise().execute(query, [userId]);
 
         if (righe.length === 0) {
-            // Se l'utente non ha ancora partite, restituisci statistiche vuote
             return res.json({
                 success: true,
                 stats: {
@@ -222,8 +250,8 @@ app.get("/api/user-stats", authenticateToken, async (req, res) => {
     }
 });
 
-// Endpoint per la classifica generale
-app.get("/api/ranking", authenticateToken, async (req, res) => {
+// SOLUZIONE 1: Endpoint classifica modificato
+app.get("/api/ranking", authenticateTokenFromHeader, async (req, res) => {
     const currentUserId = req.user.userId;
 
     try {
@@ -255,14 +283,12 @@ app.get("/api/ranking", authenticateToken, async (req, res) => {
     }
 });
 
-// Endpoint per le statistiche globali
-app.get("/api/global-stats", authenticateToken, async (req, res) => {
+// SOLUZIONE 1: Endpoint statistiche globali modificato
+app.get("/api/global-stats", authenticateTokenFromHeader, async (req, res) => {
     try {
-        // Query per contare i giocatori totali
         const playersQuery = "SELECT COUNT(*) as totalPlayers FROM utenti";
         const [playersResult] = await pool.promise().execute(playersQuery);
 
-        // Query per le statistiche delle partite
         const statsQuery = `
             SELECT 
                 COUNT(*) as playersWithGames,
@@ -297,10 +323,10 @@ app.get("/api/global-stats", authenticateToken, async (req, res) => {
     }
 });
 
-// Endpoint per aggiungere/aggiornare le statistiche di una partita (opzionale)
-app.post("/api/update-game-stats", authenticateToken, async (req, res) => {
+// SOLUZIONE 1: Endpoint aggiornamento statistiche modificato
+app.post("/api/update-game-stats", authenticateTokenFromHeader, async (req, res) => {
     const userId = req.user.userId;
-    const { won } = req.body; // true se ha vinto, false se ha perso
+    const { won } = req.body;
 
     if (typeof won !== 'boolean') {
         return res.status(400).json({
@@ -310,17 +336,14 @@ app.post("/api/update-game-stats", authenticateToken, async (req, res) => {
     }
 
     try {
-        // Controlla se l'utente ha già un record nella tabella partite
         const checkQuery = "SELECT vinte, giocate FROM partite WHERE id_giocatore = ?";
         const [existingRows] = await pool.promise().execute(checkQuery, [userId]);
 
         if (existingRows.length === 0) {
-            // Inserisci nuovo record
             const insertQuery = "INSERT INTO partite (id_giocatore, vinte, giocate) VALUES (?, ?, 1)";
             const vinte = won ? 1 : 0;
             await pool.promise().execute(insertQuery, [userId, vinte]);
         } else {
-            // Aggiorna record esistente
             const currentStats = existingRows[0];
             const newVinte = won ? currentStats.vinte + 1 : currentStats.vinte;
             const newGiocate = currentStats.giocate + 1;

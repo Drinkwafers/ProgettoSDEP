@@ -1,4 +1,6 @@
 window.onload = function () {
+    // Imposta la modalità di autenticazione
+    authManager.setAuthMode(true); // true = sessionStorage, false = cookie
 
     const form = document.getElementById("registerForm");
 
@@ -55,16 +57,16 @@ window.onload = function () {
             const data = await response.json();
 
             if (data.success) {
-                message.textContent = "Registrazione completata con successo!";
-                message.className = "success";
-                
-                // Reset del form
-                form.reset();
-                
-                // Attesa di 2 secondi prima del redirect al login
-                setTimeout(() => {
-                    window.location.href = "/login.html";
-                }, 2000);
+                // Login automatico dopo la registrazione
+                authManager.setAuthMode(true); // o false, in base alla modalità desiderata
+                const loginResult = await authManager.login(email, password);
+                if (loginResult.success) {
+                    window.location.href = "/private/resoconto-partite.html";
+                } else {
+                    message.textContent = "Registrazione riuscita, ma login fallito: " + loginResult.message;
+                    message.className = "error";
+                }
+                return;
             }
             else {
                 message.textContent = "Errore: " + data.message;

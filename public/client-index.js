@@ -15,31 +15,22 @@ class LudoClient {
 
     async checkAuthStatus() {
         try {
-            const response = await fetch('/api/userinfo', {
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    this.isAuthenticated = true;
-                    this.userInfo = data;
-                    this.playerName = data.nome;
-                    console.log('Utente autenticato:', this.playerName);
-                    this.updateUIForAuthenticatedUser();
-                } else {
-                    console.log('Utente non autenticato');
-                    this.isAuthenticated = false;
-                }
+            // Usa authManager per ottenere info utente (supporta cookie e sessionStorage)
+            const data = await authManager.getUserInfo();
+            if (data && data.success) {
+                this.isAuthenticated = true;
+                this.userInfo = data;
+                this.playerName = data.nome;
+                console.log('Utente autenticato:', this.playerName);
+                this.updateUIForAuthenticatedUser();
             } else {
-                console.log('Utente non autenticato - response not ok');
+                console.log('Utente non autenticato');
                 this.isAuthenticated = false;
             }
         } catch (error) {
             console.log('Utente non autenticato - errore:', error);
             this.isAuthenticated = false;
         }
-        
         // Inizializza la connessione WebSocket solo dopo aver verificato l'autenticazione
         this.initializeConnection();
     }
@@ -70,11 +61,18 @@ class LudoClient {
     initializeConnection() {
         try {
             this.socket = new WebSocket('ws://localhost:3001');
-            
+
             this.socket.onopen = () => {
                 console.log('Connessione WebSocket aperta');
                 this.isConnected = true;
                 this.showStatus('Connesso al server', 'success');
+                // INVIA IL TOKEN JWT SE PRESENTE (sessionStorage)
+                if (authManager.useSessionStorage) {
+                    const token = authManager.getAuthToken();
+                    if (token) {
+                        this.socket.send(JSON.stringify({ type: 'auth', data: { token } }));
+                    }
+                }
             };
 
             this.socket.onmessage = (event) => {
@@ -141,51 +139,27 @@ class LudoClient {
     }
 
     createGame(playerName) {
-        console.log('Creazione partita - isAuthenticated:', this.isAuthenticated);
-        
-        // Se l'utente è autenticato, non serve il nome dall'input
-        if (this.isAuthenticated) {
-            console.log('Creazione partita con utente autenticato:', this.playerName);
-            this.sendMessage('create-game', {});
-        } else {
-            // Utente ospite - usa il nome fornito
-            const finalPlayerName = playerName?.trim();
-            if (!finalPlayerName) {
-                this.showStatus('Inserisci un nome valido', 'error');
-                return;
-            }
-            console.log('Creazione partita con utente ospite:', finalPlayerName);
-            this.playerName = finalPlayerName;
-            this.sendMessage('create-game', { playerName: this.playerName });
+        // Se l'utente è autenticato, invia comunque il nome
+        const nameToSend = this.isAuthenticated ? this.playerName : playerName?.trim();
+        if (!nameToSend) {
+            this.showStatus('Inserisci un nome valido', 'error');
+            return;
         }
+        this.sendMessage('create-game', { playerName: nameToSend });
     }
 
     joinGame(playerName, gameId) {
-        console.log('Join partita - isAuthenticated:', this.isAuthenticated);
-        
         if (!gameId?.trim()) {
             this.showStatus('Inserisci l\'ID partita', 'error');
             return;
         }
-
-        // Se l'utente è autenticato, non serve il nome dall'input
-        if (this.isAuthenticated) {
-            console.log('Join partita con utente autenticato:', this.playerName);
-            this.sendMessage('join-game', { gameId: gameId.trim() });
-        } else {
-            // Utente ospite - usa il nome fornito
-            const finalPlayerName = playerName?.trim();
-            if (!finalPlayerName) {
-                this.showStatus('Inserisci un nome valido', 'error');
-                return;
-            }
-            console.log('Join partita con utente ospite:', finalPlayerName);
-            this.playerName = finalPlayerName;
-            this.sendMessage('join-game', { 
-                playerName: this.playerName, 
-                gameId: gameId.trim() 
-            });
+        // Se l'utente è autenticato, invia comunque il nome
+        const nameToSend = this.isAuthenticated ? this.playerName : playerName?.trim();
+        if (!nameToSend) {
+            this.showStatus('Inserisci un nome valido', 'error');
+            return;
         }
+        this.sendMessage('join-game', { playerName: nameToSend, gameId: gameId.trim() });
     }
 
     leaveGame() {
@@ -288,15 +262,12 @@ class LudoClient {
 
     async updateGameStats(won) {
         try {
-            const response = await fetch('/api/update-game-stats', {
+            // Usa authManager per la richiesta autenticata
+            const response = await authManager.authenticatedFetch('/api/update-game-stats', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
                 body: JSON.stringify({ won })
             });
-            
+
             if (response.ok) {
                 console.log('Statistiche aggiornate con successo');
             }
@@ -516,6 +487,8 @@ function rollDice() {
 // Inizializza il client quando la pagina è caricata
 window.onload = function () {
     ludoClient = new LudoClient();
+    // Imposta la modalità di autenticazione all'avvio
+    authManager.setAuthMode(true); // true = sessionStorage, false = cookie
 };
 
 // Gestione chiusura finestra

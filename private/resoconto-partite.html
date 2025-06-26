@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="resoconto-partite.css">
      <link rel="stylesheet" href="../navigation.css">
     <script src="resoconto-partite.js"></script>
+    <!-- Esempio in index.html, login.html, register.html, private/resoconto-partite.html -->
+    <script src="auth-manager.js"></script>
+    <script src="login-script.js"></script>
+    <!-- ... -->
 </head>
 <body>
     <div class="header">
@@ -100,6 +104,21 @@
     </div>
 
     <script src="../navigation.js"></script>
+    <script>
+        // Esempio di utilizzo di authenticatedFetch
+        async function fetchUserData() {
+            try {
+                const response = await authManager.authenticatedFetch('/api/userinfo', { method: 'GET' });
+                const data = await response.json();
+                // Gestisci i dati ricevuti
+            } catch (error) {
+                console.error('Errore nel recupero dei dati utente:', error);
+            }
+        }
+
+        // Chiamata alla funzione per il caricamento iniziale dei dati
+        fetchUserData();
+    </script>
 </body>
 </html>
 

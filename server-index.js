@@ -53,10 +53,23 @@ wss.on('connection', (ws) => {
   ws.on('message', function incoming(message) {
     let msg;
     try {
-      msg = JSON.parse(message);
+        msg = JSON.parse(message);
     } catch (e) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
-      return;
+        ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
+        return;
+    }
+
+    // GESTIONE AUTENTICAZIONE VIA TOKEN (sessionStorage)
+    if (msg.type === 'auth' && msg.data && msg.data.token) {
+        try {
+            const payload = jwt.verify(msg.data.token, JWT_SECRET);
+            ws.user = { userId: payload.userId, userName: payload.userName };
+            ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione WebSocket riuscita' }));
+        } catch (err) {
+            ws.user = null;
+            ws.send(JSON.stringify({ type: 'error', message: 'Token WebSocket non valido' }));
+        }
+        return; // Non processare altro per questo messaggio
     }
 
     console.log('Messaggio ricevuto:', msg.type, msg.data);
@@ -89,7 +102,8 @@ wss.on('connection', (ws) => {
         players: [{
           id: playerId,
           name: playerName,
-          isAuthenticated: isAuthenticated
+          isAuthenticated: isAuthenticated,
+          ...(isAuthenticated && ws.user ? { userId: ws.user.userId } : {})
         }],
         host: playerId,
         status: 'waiting'
@@ -152,9 +166,16 @@ wss.on('connection', (ws) => {
       }
 
       // Nome già presente
-      if (game.players.some(p => p.name === playerName)) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Nome già presente nella partita' }));
-        return;
+      if (game.players.some(p => 
+          p.name === playerName && (
+              // Se autenticato, blocca solo se userId è diverso
+              (isAuthenticated && ws.user && p.isAuthenticated && ws.user.userId !== undefined && p.userId !== ws.user.userId) ||
+              // Se ospite, blocca sempre
+              (!isAuthenticated)
+          )
+      )) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Nome già presente nella partita' }));
+          return;
       }
 
       // Genera un nuovo playerId
@@ -164,7 +185,8 @@ wss.on('connection', (ws) => {
       game.players.push({
         id: playerId,
         name: playerName,
-        isAuthenticated: isAuthenticated
+        isAuthenticated: isAuthenticated,
+        ...(isAuthenticated && ws.user ? { userId: ws.user.userId } : {})
       });
 
       // Salva la connessione

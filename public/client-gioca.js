@@ -35,9 +35,10 @@ document.addEventListener('DOMContentLoaded', function() {
         'verde': 20,
         'giallo': 30
     };
-
+    
+    
     // Variabili di stato locale (sincronizzate con il server)
-    let turnoCorrente = 'blu';
+    let turnoCorrente = '';
     let dado = 0;
     let dadoTirato = false;
 
@@ -87,8 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
             case 'game-started':
                 gameState = message.data.gameState;
                 playerColor = gameState.players.find(p => p.id === playerId)?.color;
-                // AGGIUNGI QUESTO:
-                turnoCorrente = message.data.turnoCorrente || gameState.players[0].color;
+                // Imposta il turno corrente al colore del giocatore che deve iniziare (dal server)
+                turnoCorrente = gameState.turnoCorrente || gameState.players[0].color;
                 initializeLocalGame();
                 break;
 
@@ -458,4 +459,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Rendi le funzioni accessibili globalmente
     window.tiraDado = tiraDado;
+
+    // Aggiungi questa funzione per aggiornare le statistiche del gioco
+    async function updateGameStats(won) {
+        await authManager.authenticatedFetch('/api/update-game-stats', {
+            method: 'POST',
+            body: JSON.stringify({ won: won })
+        });
+    }
+
+    // Esempio di utilizzo: aggiorna le statistiche quando il gioco termina
+    // updateGameStats(true); // Chiama questa funzione con 'true' o 'false' a seconda del risultato
 });
