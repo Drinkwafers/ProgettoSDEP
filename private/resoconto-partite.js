@@ -141,6 +141,27 @@ window.onload = function() {
         }
     }
 
+    // Funzione per rendere la classifica
+    function renderRanking(ranking, currentUserId) {
+        const tbody = document.getElementById('rankingBody');
+        tbody.innerHTML = '';
+
+        ranking.forEach((player, index) => {
+            const tr = document.createElement('tr');
+            if (`${player.id}` === `${currentUserId}`) {
+                tr.classList.add('current-user-row');
+            }
+            tr.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${player.nome}</td>
+                <td>${player.vinte}</td>
+                <td>${player.giocate}</td>
+                <td>${Number(player.percentuale_vittorie).toFixed(1)}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
     // Event listeners
     logoutBtn.addEventListener('click', logout);
     retryBtn.addEventListener('click', loadAllData);

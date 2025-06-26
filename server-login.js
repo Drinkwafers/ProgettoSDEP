@@ -73,7 +73,7 @@ function authenticateToken(req, res, next) {
 }
 
 // Proteggo la cartella /private
-app.use("/private", authenticateToken, express.static("private"));
+app.use("/private", express.static("private"));
 
 // Endpoint registrazione
 app.post("/api/register", async (req, res) => {
