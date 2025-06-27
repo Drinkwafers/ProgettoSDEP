@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(col!==playerColor) return alert('Non tua pedina');
         const cls=cell.className;
         const curr={ posizione: cls.includes('casella-')?'percorso':'base', casella:cls.includes('casella-')?parseInt(cls.split('-')[1]):null, pieceId:1 };
-        let np= curr.casella? ((curr.casella+dado-1)%40+1):1;
+        let np= curr.casella? ((curr.casella+dado-1)%40+1): (col==='blu'?1:col==='rosso'?11:col==='verde'?21:31);
         ws.send(JSON.stringify({ type:'move-piece', data:{ gameId, playerId, pieceId:curr.pieceId, newPosition:`percorso-${np}` } }));
       };
     }); }

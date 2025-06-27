@@ -63,82 +63,38 @@ wss.on('connection', ws => {
       return ws.send(JSON.stringify({ type: 'rejoined', data: { gameState: game } }));
     }
 
-   // Crea nuova partita
+    // Crea nuova partita
     if (msg.type === 'create-game') {
-        const name = msg.data.playerName;
-        const gameId = Math.random().toString(36).substr(2, 8);
-        const playerId = Math.random().toString(36).substr(2, 9);
-
-        // Rileva se l'utente è autenticato (sessionStorage o cookie)
-        const isAuth = ws.user && ws.user.userId;
-        const playerEntry = {
-            id: playerId,
-            name: isAuth ? ws.user.userName : name,
-            color: null,
-            pedine: [],
-            isAuthenticated: Boolean(isAuth),
-            userId: isAuth ? ws.user.userId : null
-        };
-
-        const gameState = {
-            players: [playerEntry],
-            host: playerId,
-            gameData: {},
-            status: 'waiting'
-        };
-
-        games[gameId] = gameState;
-        playerSockets[playerId] = ws;
-        ws.send(JSON.stringify({
-            type: 'game-created',
-            data: { gameId, playerId, gameState }
-        }));
-        return;
+      const name = msg.data.playerName;
+      const gameId = Math.random().toString(36).substr(2,8);
+      const playerId = Math.random().toString(36).substr(2,9);
+      const colorOrder = ['blu','rosso','verde','giallo'];
+      const gameState = {
+        players: [{ id: playerId, name, color: null, pedine: [] }],
+        host: playerId,
+        turnoCorrente: null,
+        gameData: {},
+        status: 'waiting'
+      };
+      games[gameId] = gameState;
+      playerSockets[playerId] = ws;
+      ws.send(JSON.stringify({ type: 'game-created', data: { gameId, playerId, gameState } }));
+      return;
     }
 
     // Join partita
     if (msg.type === 'join-game') {
-        const { gameId, playerName } = msg.data;
-        const game = games[gameId];
-
-        if (!game || game.players.length >= 4) {
-            return ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Impossibile entrare nella partita'
-            }));
-       }
-
-       const playerId = Math.random().toString(36).substr(2, 9);
-        // Rileva autenticazione
-        const isAuth = ws.user && ws.user.userId;
-        const playerEntry = {
-            id: playerId,
-            name: isAuth ? ws.user.userName : playerName,
-            color: null,
-            pedine: [],
-            isAuthenticated: Boolean(isAuth),
-            userId: isAuth ? ws.user.userId : null
-        };
-
-        game.players.push(playerEntry);
-       playerSockets[playerId] = ws;
-
-        // Notifica join
-        ws.send(JSON.stringify({
-            type: 'game-joined',
-            data: { gameId, playerId, gameState: game }
-        }));
-
-        // Broadcast update
-        game.players.forEach(p => {
-            if (playerSockets[p.id]) {
-                playerSockets[p.id].send(JSON.stringify({
-                    type: 'game-updated',
-                    data: { gameState: game }
-                }));
-            }
-        });
-        return;
+      const { gameId, playerName } = msg.data;
+      const game = games[gameId];
+      if (!game || game.players.length >= 4) return ws.send(JSON.stringify({ type: 'error', message: 'Impossibile entrare' }));
+      const playerId = Math.random().toString(36).substr(2,9);
+      game.players.push({ id: playerId, name: playerName, color: null, pedine: [] });
+      playerSockets[playerId] = ws;
+      // Notifica join
+      ws.send(JSON.stringify({ type: 'game-joined', data: { gameId, playerId, gameState: game } }));
+      // Broadcast update
+      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type: 'game-updated', data: { gameState: game } })));
+      return;
     }
 
     // Start partita
@@ -163,6 +119,7 @@ wss.on('connection', ws => {
 
     // Tira dado
     if (msg.type === 'throw-dice') {
+      console.log('Ricevuto comando di tiro dado:', msg);
       const { gameId, playerId } = msg.data;
       const game = games[gameId];
       if (!game) return;
@@ -177,6 +134,7 @@ wss.on('connection', ws => {
 
     // Muovi pedina
     if (msg.type === 'move-piece') {
+      console.log('Ricevuto comando di movimento pedina:', msg);
       const { gameId, playerId, pieceId, newPosition } = msg.data;
       const game = games[gameId];
       if (!game) return;

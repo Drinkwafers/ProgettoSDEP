@@ -90,9 +90,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 initializeLocalGame();
                 break;
 
-            case 'dice-thrown':
-                handleDiceThrown(message.data);
-                break;
+            
+case 'dice-thrown':
+    const dadoDiv = document.getElementById("valore-dado");
+    if (dadoDiv) {
+        dadoDiv.textContent = `🎲 Dado: ${message.data.value}`;
+    }
+    break;
+
 
             case 'piece-moved':
                 handlePieceMoved(message.data);
