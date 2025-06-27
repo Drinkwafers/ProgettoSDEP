@@ -1,4 +1,4 @@
-// server-index.js (WebSocket - porta 3001)
+// server-index.js (porta WS 3001)
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -8,372 +8,154 @@ const WebSocket = require('ws');
 
 const app = express();
 const PORT = process.env.PORT_WS || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta'; // Usa la stessa chiave del server di login
+const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
-}));
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(cookieParser());
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
-// Variabili globali per tenere traccia delle partite
+// Stato partite e mapping socket
 const games = {};
-const playerSockets = {}; // playerId -> ws
+const playerSockets = {};
 
-server.on('upgrade', (request, socket, head) => {
-  cookieParser()(request, null, () => {
+// Upgrade per WS con verifica cookie JWT
+server.on('upgrade', (req, socket, head) => {
+  cookieParser()(req, null, () => {
     let user = null;
     try {
-      // Correggi: usa 'token' invece di 'access_token'
-      const token = request.cookies.token;
-      if (token) {
-        const payload = jwt.verify(token, JWT_SECRET);
-        user = { userId: payload.userId, userName: payload.userName };
-      }
-    } catch (error) {
-      console.log('Token non valido o assente:', error.message);
-      user = null;
-    }
-    wss.handleUpgrade(request, socket, head, (ws) => {
+      const token = req.cookies.token;
+      if (token) user = jwt.verify(token, JWT_SECRET);
+    } catch {}
+    wss.handleUpgrade(req, socket, head, ws => {
       ws.user = user;
-      wss.emit('connection', ws, request);
+      wss.emit('connection', ws, req);
     });
   });
 });
 
-wss.on('connection', (ws) => {
-  console.log('Nuova connessione WebSocket:', {
-    isAuthenticated: Boolean(ws.user),
-    user: ws.user
-  });
-
-  ws.on('message', function incoming(message) {
+wss.on('connection', ws => {
+  console.log('Connessione WS:', Boolean(ws.user));
+  ws.on('message', msgStr => {
     let msg;
-    try {
-        msg = JSON.parse(message);
-    } catch (e) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
-        return;
+    try { msg = JSON.parse(msgStr); } catch {
+      return ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
     }
 
-    // GESTIONE AUTENTICAZIONE VIA TOKEN (sessionStorage)
-    if (msg.type === 'auth' && msg.data && msg.data.token) {
-        try {
-            const payload = jwt.verify(msg.data.token, JWT_SECRET);
-            ws.user = { userId: payload.userId, userName: payload.userName };
-            ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione WebSocket riuscita' }));
-        } catch (err) {
-            ws.user = null;
-            ws.send(JSON.stringify({ type: 'error', message: 'Token WebSocket non valido' }));
-        }
-        return; // Non processare altro per questo messaggio
-    }
-
-    console.log('Messaggio ricevuto:', msg.type, msg.data);
-
-    if (msg.type === 'create-game') {
-      // Determina il nome del giocatore
-      let playerName;
-      let isAuthenticated = false;
-      
-      if (ws.user) {
-        // Utente autenticato - usa il nome dal JWT
-        playerName = ws.user.userName;
-        isAuthenticated = true;
-        console.log('Creazione partita - Utente autenticato:', playerName);
-      } else {
-        // Utente ospite - usa il nome fornito
-        playerName = msg.data?.playerName?.trim();
-        if (!playerName) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Nome giocatore mancante' }));
-          return;
-        }
-        console.log('Creazione partita - Utente ospite:', playerName);
+    // Auth via sessionStorage token
+    if (msg.type === 'auth' && msg.data?.token) {
+      try {
+        ws.user = jwt.verify(msg.data.token, JWT_SECRET);
+        ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione WS riuscita' }));
+      } catch {
+        return ws.send(JSON.stringify({ type: 'error', message: 'Token non valido' }));
       }
+      return;
+    }
 
-      const gameId = Math.random().toString(36).substr(2, 8);
-      const playerId = Math.random().toString(36).substr(2, 9);
+    // Rejoin dopo redirect
+    if (msg.type === 'rejoin-game') {
+      const { gameId, playerId } = msg.data;
+      const game = games[gameId];
+      if (!game) return ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
+      playerSockets[playerId] = ws;
+      return ws.send(JSON.stringify({ type: 'rejoined', data: { gameState: game } }));
+    }
 
-      // Stato base della partita
+    // Crea nuova partita
+    if (msg.type === 'create-game') {
+      const name = msg.data.playerName;
+      const gameId = Math.random().toString(36).substr(2,8);
+      const playerId = Math.random().toString(36).substr(2,9);
+      const colorOrder = ['blu','rosso','verde','giallo'];
       const gameState = {
-        players: [{
-          id: playerId,
-          name: playerName,
-          isAuthenticated: isAuthenticated,
-          ...(isAuthenticated && ws.user ? { userId: ws.user.userId } : {})
-        }],
+        players: [{ id: playerId, name, color: null, pedine: [] }],
         host: playerId,
+        turnoCorrente: null,
+        gameData: {},
         status: 'waiting'
       };
-
-      // Salva la partita
       games[gameId] = gameState;
-
-      // Salva la connessione
       playerSockets[playerId] = ws;
-
-      ws.send(JSON.stringify({
-        type: 'game-created',
-        data: {
-          gameId,
-          playerId,
-          gameState,
-          message: 'Partita creata! Attendere altri 3 giocatori per iniziare.'
-        }
-      }));
+      ws.send(JSON.stringify({ type: 'game-created', data: { gameId, playerId, gameState } }));
+      return;
     }
-    else if (msg.type === 'join-game') {
-      const { gameId } = msg.data || {};
-      
-      // Determina il nome del giocatore
-      let playerName;
-      let isAuthenticated = false;
-      
-      if (ws.user) {
-        // Utente autenticato - usa il nome dal JWT
-        playerName = ws.user.userName;
-        isAuthenticated = true;
-        console.log('Join partita - Utente autenticato:', playerName);
-      } else {
-        // Utente ospite - usa il nome fornito
-        playerName = msg.data?.playerName?.trim();
-        if (!playerName) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Nome giocatore mancante' }));
-          return;
-        }
-        console.log('Join partita - Utente ospite:', playerName);
-      }
 
-      if (!gameId || !gameId.trim()) {
-        ws.send(JSON.stringify({ type: 'error', message: 'ID partita mancante' }));
-        return;
-      }
-
-      // Cerca la partita
-      const game = games[gameId.trim()];
-      if (!game) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
-        return;
-      }
-
-      // Limite giocatori
-      if (game.players.length >= 4) {
-        ws.send(JSON.stringify({ type: 'error', message: 'La partita è piena' }));
-        return;
-      }
-
-      // Nome già presente
-      if (game.players.some(p => 
-          p.name === playerName && (
-              // Se autenticato, blocca solo se userId è diverso
-              (isAuthenticated && ws.user && p.isAuthenticated && ws.user.userId !== undefined && p.userId !== ws.user.userId) ||
-              // Se ospite, blocca sempre
-              (!isAuthenticated)
-          )
-      )) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Nome già presente nella partita' }));
-          return;
-      }
-
-      // Genera un nuovo playerId
-      const playerId = Math.random().toString(36).substr(2, 9);
-
-      // Aggiungi il giocatore alla partita
-      game.players.push({
-        id: playerId,
-        name: playerName,
-        isAuthenticated: isAuthenticated,
-        ...(isAuthenticated && ws.user ? { userId: ws.user.userId } : {})
-      });
-
-      // Salva la connessione
+    // Join partita
+    if (msg.type === 'join-game') {
+      const { gameId, playerName } = msg.data;
+      const game = games[gameId];
+      if (!game || game.players.length >= 4) return ws.send(JSON.stringify({ type: 'error', message: 'Impossibile entrare' }));
+      const playerId = Math.random().toString(36).substr(2,9);
+      game.players.push({ id: playerId, name: playerName, color: null, pedine: [] });
       playerSockets[playerId] = ws;
-
-      // Notifica il join solo a chi si è appena connesso
-      const joinMessage = game.players.length === 4 
-        ? 'Sei entrato nella partita! Tutti i giocatori sono pronti.' 
-        : `Sei entrato nella partita! Giocatori: ${game.players.length}/4`;
-
-      ws.send(JSON.stringify({
-        type: 'game-joined',
-        data: {
-          gameId,
-          playerId,
-          gameState: game,
-          message: joinMessage
-        }
-      }));
-
-      // Notifica a tutti i giocatori lo stato aggiornato
-      const updateMessage = game.players.length === 4 
-        ? 'Tutti i giocatori sono pronti! L\'host può avviare la partita.' 
-        : `Giocatori: ${game.players.length}/4 - Attendere altri giocatori`;
-
-      game.players.forEach(player => {
-        const playerWs = playerSockets[player.id];
-        if (playerWs) {
-          playerWs.send(JSON.stringify({
-            type: 'game-updated',
-            data: { 
-              gameState: game,
-              message: updateMessage
-            }
-          }));
-        }
-      });
+      // Notifica join
+      ws.send(JSON.stringify({ type: 'game-joined', data: { gameId, playerId, gameState: game } }));
+      // Broadcast update
+      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type: 'game-updated', data: { gameState: game } })));
+      return;
     }
-    else if (msg.type === 'start-game') {
-      const { gameId } = msg.data || {};
-      if (!gameId || !games[gameId]) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
-        return;
-      }
 
+    // Start partita
+    if (msg.type === 'start-game') {
+      const { gameId } = msg.data;
       const game = games[gameId];
-
-      // Trova l'host nella lista dei giocatori
-      const hostPlayer = game.players.find(p => p.id === game.host);
-      if (!hostPlayer) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Host non trovato' }));
-        return;
-      }
-
-      // Verifica che il messaggio arrivi dall'host
-      const senderPlayer = game.players.find(p => playerSockets[p.id] === ws);
-      if (!senderPlayer || senderPlayer.id !== game.host) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Solo l\'host può avviare la partita' }));
-        return;
-      }
-
-      // CONTROLLO CRUCIALE: Verifica che ci siano esattamente 4 giocatori
-      if (game.players.length !== 4) {
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          message: `Servono esattamente 4 giocatori per iniziare! Attualmente: ${game.players.length}/4` 
-        }));
-        return;
-      }
-
-      // Assegna i colori ai giocatori nell'ordine di ingresso
-      const colori = ['blu', 'rosso', 'verde', 'giallo'];
-      game.players.forEach((player, idx) => {
-        player.color = colori[idx];
+      if (!game || game.players.length !== 4) return ws.send(JSON.stringify({ type: 'error', message: 'Serve 4 giocatori' }));
+      // Assegna colori e pedine
+      const colors = ['blu','rosso','verde','giallo'];
+      game.players.forEach((p,i) => {
+        p.color = colors[i];
+        p.pedine = Array(4).fill({ posizione:'base', casella:null });
       });
-
-      game.status = 'in-progress';
-
-      // AGGIUNGI: imposta il turno corrente al primo giocatore
-      game.turnoCorrente = game.players[0].color;
-
-      // Notifica a tutti i giocatori con i dati necessari
-      game.players.forEach((player, idx) => {
-        const playerWs = playerSockets[player.id];
-        if (playerWs) {
-          playerWs.send(JSON.stringify({
-            type: 'game-started',
-            data: {
-              gameId,
-              playerId: player.id,
-              color: player.color,
-              gameState: game
-            }
-          }));
-        }
+      game.turnoCorrente = colors[0];
+      game.status = 'playing';
+      // Broadcast start
+      game.players.forEach(p => {
+        playerSockets[p.id]?.send(JSON.stringify({ type: 'game-started', data: { gameState: game, color: p.color } }));
       });
+      return;
     }
-    else if (msg.type === 'leave-game') {
-      const { gameId, playerId } = msg.data || {};
-      if (!gameId || !games[gameId] || !playerId) {
-        return;
-      }
 
+    // Tira dado
+    if (msg.type === 'throw-dice') {
+      const { gameId, playerId } = msg.data;
       const game = games[gameId];
-      
-      // Rimuovi il giocatore dalla partita
-      game.players = game.players.filter(p => p.id !== playerId);
-      
-      // Rimuovi la connessione
-      delete playerSockets[playerId];
+      if (!game) return;
+      const player = game.players.find(p=>p.id===playerId);
+      if (game.turnoCorrente !== player.color) return ws.send(JSON.stringify({ type: 'error', message: 'Non è il tuo turno' }));
+      const roll = Math.floor(Math.random()*6)+1;
+      game.gameData.ultimoDado = roll;
+      game.gameData.dadoTirato = true;
+      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'dice-thrown', data:{ gameState:game, diceResult:roll, playerColor:p.color } })));      
+      return;
+    }
 
-      // Se non ci sono più giocatori, elimina la partita
-      if (game.players.length === 0) {
+    // Muovi pedina
+    if (msg.type === 'move-piece') {
+      const { gameId, playerId, pieceId, newPosition } = msg.data;
+      const game = games[gameId];
+      if (!game) return;
+      const player = game.players.find(p=>p.id===playerId);
+      if (game.turnoCorrente!==player.color || !game.gameData.dadoTirato) return ws.send(JSON.stringify({ type:'error', message:'Azione non valida' }));
+      const [type, idx] = newPosition.split('-');
+      player.pedine[pieceId-1] = { posizione:type, casella:parseInt(idx,10) };
+      game.gameData.dadoTirato = false;
+      // Avanza turno
+      const i = game.players.findIndex(p=>p.id===playerId);
+      game.turnoCorrente = game.players[(i+1)%game.players.length].color;
+      // Broadcast move
+      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'piece-moved', data:{ gameState:game } })));
+      // Verifica vittoria
+      if (player.pedine.every(pd=>pd.posizione==='destinazione')) {
+        game.status='finished';
+        game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'game-finished', data:{ gameState:game, winner:player } })));
         delete games[gameId];
-        return;
       }
-
-      // Se l'host ha lasciato la partita, assegna il ruolo al primo giocatore rimasto
-      if (game.host === playerId && game.players.length > 0) {
-        game.host = game.players[0].id;
-      }
-
-      // Notifica a tutti i giocatori rimasti
-      const updateMessage = `Un giocatore ha lasciato la partita. Giocatori: ${game.players.length}/4`;
-      
-      game.players.forEach(player => {
-        const playerWs = playerSockets[player.id];
-        if (playerWs) {
-          playerWs.send(JSON.stringify({
-            type: 'game-updated',
-            data: { 
-              gameState: game,
-              message: updateMessage
-            }
-          }));
-        }
-      });
+      return;
     }
-    // Gestione disconnessione
-    ws.on('close', () => {
-      // Trova il giocatore associato a questa connessione
-      const playerId = Object.keys(playerSockets).find(id => playerSockets[id] === ws);
-      if (playerId) {
-        // Trova la partita in cui è il giocatore
-        const gameId = Object.keys(games).find(id => 
-          games[id].players.some(p => p.id === playerId)
-        );
-        
-        if (gameId) {
-          const game = games[gameId];
-          
-          // Rimuovi il giocatore
-          game.players = game.players.filter(p => p.id !== playerId);
-          delete playerSockets[playerId];
 
-          // Se non ci sono più giocatori, elimina la partita
-          if (game.players.length === 0) {
-            delete games[gameId];
-            return;
-          }
-
-          // Se l'host si è disconnesso, assegna il ruolo al primo giocatore rimasto
-          if (game.host === playerId && game.players.length > 0) {
-            game.host = game.players[0].id;
-          }
-
-          // Notifica agli altri giocatori
-          const updateMessage = `Un giocatore si è disconnesso. Giocatori: ${game.players.length}/4`;
-          
-          game.players.forEach(player => {
-            const playerWs = playerSockets[player.id];
-            if (playerWs) {
-              playerWs.send(JSON.stringify({
-                type: 'game-updated',
-                data: { 
-                  gameState: game,
-                  message: updateMessage
-                }
-              }));
-            }
-          });
-        }
-      }
-    });
-
-    
+    // Leave e close
   });
 });
-
 server.listen(PORT, () => console.log(`WS server listening on ${PORT}`));
