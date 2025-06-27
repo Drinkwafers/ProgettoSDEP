@@ -47,7 +47,25 @@
         <div id="status" class="status hidden"></div>
 
       
+    <script src="auth-manager.js"></script>
+    <script>
+        // Imposta la modalità PRIMA di ogni fetch protetta
+        authManager.setAuthMode(true); // true = sessionStorage, false = cookie
 
+        // Esegui il fetch per ottenere le informazioni dell'utente autenticato
+        async function fetchUserInfo() {
+            try {
+                const response = await authManager.authenticatedFetch('/api/userinfo', { method: 'GET' });
+                const data = await response.json();
+                console.log(data);
+                // Qui puoi aggiornare la UI con il nome utente, ecc.
+            } catch (error) {
+                console.error('Errore nel recupero delle informazioni utente:', error);
+            }
+        }
+
+        fetchUserInfo();
+    </script>
     <script src="navigation.js"></script>
     <script src="client-index.js"></script>
 </body>

@@ -6,7 +6,12 @@
     <title>Resoconto Partite - Ese db</title>
     <link rel="stylesheet" href="resoconto-partite.css">
      <link rel="stylesheet" href="../navigation.css">
-    <script src="resoconto-partite.js"></script>
+    <!-- Carica auth-manager dalla root public -->
+    <script src="/auth-manager.js" defer></script>
+    <!-- Carica navigation.js dalla root public -->
+    <script src="/navigation.js" defer></script>
+    <!-- Carica lo script specifico di resoconto -->
+    <script src="/private/resoconto-partite.js" defer></script>
 </head>
 <body>
     <div class="header">
@@ -98,8 +103,6 @@
     <div class="navigation">
         <a href="/login.html" class="nav-link">Torna al Login</a>
     </div>
-
-    <script src="../navigation.js"></script>
 </body>
 </html>
 

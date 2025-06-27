@@ -1,4 +1,7 @@
 window.onload = function() {
+    // Imposta la modalità di autenticazione
+    authManager.setAuthMode(true); // true = sessionStorage, false = cookie
+
     // Elementi del DOM
     const loading = document.getElementById('loading');
     const content = document.getElementById('content');
@@ -25,15 +28,8 @@ window.onload = function() {
     // Funzione per caricare i dati dell'utente
     async function loadUserInfo() {
         try {
-            const response = await fetch('/api/userinfo', {
-                method: 'GET',
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Non autorizzato');
-            }
-
+            const response = await authManager.authenticatedFetch('/api/userinfo', { method: 'GET' });
+            if (!response.ok) throw new Error('Non autorizzato');
             const data = await response.json();
             if (data.success) {
                 userName.textContent = data.nome;
@@ -47,22 +43,14 @@ window.onload = function() {
     // Funzione per caricare le statistiche personali
     async function loadUserStats() {
         try {
-            const response = await fetch('/api/user-stats', {
-                method: 'GET',
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Errore nel caricamento delle statistiche personali');
-            }
-
+            const response = await authManager.authenticatedFetch('/api/user-stats', { method: 'GET' });
+            if (!response.ok) throw new Error('Errore nel caricamento delle statistiche personali');
             const data = await response.json();
             if (data.success) {
                 const stats = data.stats;
                 userWins.textContent = stats.vinte || 0;
                 userPlayed.textContent = stats.giocate || 0;
                 userLosses.textContent = (stats.giocate - stats.vinte) || 0;
-                
                 const winRate = stats.giocate > 0 ? ((stats.vinte / stats.giocate) * 100).toFixed(1) : 0;
                 userWinRate.textContent = winRate + '%';
             }
@@ -75,15 +63,8 @@ window.onload = function() {
     // Funzione per caricare la classifica generale
     async function loadRanking() {
         try {
-            const response = await fetch('/api/ranking', {
-                method: 'GET',
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Errore nel caricamento della classifica');
-            }
-
+            const response = await authManager.authenticatedFetch('/api/ranking', { method: 'GET' });
+            if (!response.ok) throw new Error('Errore nel caricamento della classifica');
             const data = await response.json();
             if (data.success) {
                 renderRanking(data.ranking, data.currentUserId);
@@ -94,50 +75,11 @@ window.onload = function() {
         }
     }
 
-    // Funzione per renderizzare la classifica
-    function renderRanking(ranking, currentUserId) {
-        rankingBody.innerHTML = '';
-        
-        ranking.forEach((player, index) => {
-            const row = document.createElement('tr');
-            const position = index + 1;
-            const winRate = player.giocate > 0 ? ((player.vinte / player.giocate) * 100).toFixed(1) : 0;
-            
-            // Evidenzia l'utente corrente
-            if (player.id === currentUserId) {
-                row.classList.add('current-user');
-            }
-            
-            // Classe per le posizioni del podio
-            let positionClass = 'position';
-            if (position === 1) positionClass += ' gold';
-            else if (position === 2) positionClass += ' silver';
-            else if (position === 3) positionClass += ' bronze';
-            
-            row.innerHTML = `
-                <td><span class="${positionClass}">${position}</span></td>
-                <td>${player.nome}</td>
-                <td>${player.vinte}</td>
-                <td>${player.giocate}</td>
-                <td>${winRate}%</td>
-            `;
-            
-            rankingBody.appendChild(row);
-        });
-    }
-
     // Funzione per caricare le statistiche globali
     async function loadGlobalStats() {
         try {
-            const response = await fetch('/api/global-stats', {
-                method: 'GET',
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Errore nel caricamento delle statistiche globali');
-            }
-
+            const response = await authManager.authenticatedFetch('/api/global-stats', { method: 'GET' });
+            if (!response.ok) throw new Error('Errore nel caricamento delle statistiche globali');
             const data = await response.json();
             if (data.success) {
                 const stats = data.stats;
@@ -187,13 +129,8 @@ window.onload = function() {
     // Funzione di logout
     async function logout() {
         try {
-            const response = await fetch('/api/logout', {
-                method: 'POST',
-                credentials: 'include'
-            });
-
-            const data = await response.json();
-            if (data.success) {
+            const result = await authManager.logout();
+            if (result.success) {
                 window.location.href = '/login.html';
             } else {
                 alert('Errore durante il logout');
@@ -202,6 +139,27 @@ window.onload = function() {
             console.error('Errore logout:', err);
             alert('Errore durante il logout');
         }
+    }
+
+    // Funzione per rendere la classifica
+    function renderRanking(ranking, currentUserId) {
+        const tbody = document.getElementById('rankingBody');
+        tbody.innerHTML = '';
+
+        ranking.forEach((player, index) => {
+            const tr = document.createElement('tr');
+            if (`${player.id}` === `${currentUserId}`) {
+                tr.classList.add('current-user-row');
+            }
+            tr.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${player.nome}</td>
+                <td>${player.vinte}</td>
+                <td>${player.giocate}</td>
+                <td>${Number(player.percentuale_vittorie).toFixed(1)}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
 
     // Event listeners

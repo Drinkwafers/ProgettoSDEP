@@ -1,4 +1,6 @@
 window.onload = function () {
+    // Imposta la modalità di autenticazione
+    authManager.setAuthMode(true); // true = sessionStorage, false = cookie
 
     const form = document.getElementById("loginForm");
 
@@ -20,38 +22,18 @@ window.onload = function () {
             return;
         }
 
-        try {
-            const response = await fetch("/api/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                credentials: "include",
-                body: JSON.stringify({ email, password })
-            });
+        // Usa authManager per il login
+        const result = await authManager.login(email, password);
 
-            const data = await response.json();
-
-            if (data.success) {
-                message.textContent = "Login effettuato con successo!";
-                message.className = "success";
-                
-                // Attesa di 1 secondo prima del redirect per mostrare il messaggio
-                setTimeout(() => {
-                    window.location.href = "/private/resoconto-partite.html";
-                }, 1000);
-            }
-            else {
-                message.textContent = "Errore: " + data.message;
-                message.className = "error";
-            }
-        }
-        catch (error) {
-            message.textContent = "Errore di rete.";
+        if (result.success) {
+            message.textContent = "Login effettuato con successo!";
+            message.className = "success";
+            setTimeout(() => {
+                window.location.href = "/private/resoconto-partite.html";
+            }, 1000);
+        } else {
+            message.textContent = "Errore: " + result.message;
             message.className = "error";
-            console.error('Errore di connessione:', error);
         }
-
     });
-
 };

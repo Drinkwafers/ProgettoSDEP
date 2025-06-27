@@ -199,6 +199,11 @@ tr.current-user td {
     font-weight: 600;
 }
 
+.current-user-row {
+  background-color: #e0f7fa;
+  font-weight: bold;
+}
+
 .position {
     font-weight: bold;
     color: #667eea;

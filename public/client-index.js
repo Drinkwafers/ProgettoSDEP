@@ -11,28 +11,28 @@ class LudoClient {
         this.userInfo = null;
         
         this.checkAuthStatus();
-        this.initializeConnection();
     }
 
     async checkAuthStatus() {
         try {
-            const response = await fetch('/api/userinfo', {
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    this.isAuthenticated = true;
-                    this.userInfo = data;
-                    this.playerName = data.nome;
-                    this.updateUIForAuthenticatedUser();
-                }
+            // Usa authManager per ottenere info utente (supporta cookie e sessionStorage)
+            const data = await authManager.getUserInfo();
+            if (data && data.success) {
+                this.isAuthenticated = true;
+                this.userInfo = data;
+                this.playerName = data.nome;
+                console.log('Utente autenticato:', this.playerName);
+                this.updateUIForAuthenticatedUser();
+            } else {
+                console.log('Utente non autenticato');
+                this.isAuthenticated = false;
             }
         } catch (error) {
-            console.log('Utente non autenticato - modalità ospite');
+            console.log('Utente non autenticato - errore:', error);
             this.isAuthenticated = false;
         }
+        // Inizializza la connessione WebSocket solo dopo aver verificato l'autenticazione
+        this.initializeConnection();
     }
 
     updateUIForAuthenticatedUser() {
@@ -61,14 +61,18 @@ class LudoClient {
     initializeConnection() {
         try {
             this.socket = new WebSocket('ws://localhost:3001');
+
             this.socket.onopen = () => {
-                // Invia il token JWT appena la connessione è aperta
-                const token = this.getCookie('token');
-                if (token) {
-                    this.socket.send(JSON.stringify({ type: 'auth', token }));
-                }
+                console.log('Connessione WebSocket aperta');
                 this.isConnected = true;
                 this.showStatus('Connesso al server', 'success');
+                // INVIA IL TOKEN JWT SE PRESENTE (sessionStorage)
+                if (authManager.useSessionStorage) {
+                    const token = authManager.getAuthToken();
+                    if (token) {
+                        this.socket.send(JSON.stringify({ type: 'auth', data: { token } }));
+                    }
+                }
             };
 
             this.socket.onmessage = (event) => {
@@ -127,46 +131,35 @@ class LudoClient {
 
     sendMessage(type, data = {}) {
         if (this.socket && this.isConnected) {
-            // Aggiungi informazioni di autenticazione al messaggio
-            const messageData = {
-                ...data,
-                isAuthenticated: this.isAuthenticated,
-                userInfo: this.isAuthenticated ? this.userInfo : null
-            };
-            
-            this.socket.send(JSON.stringify({ type, data: messageData }));
+            console.log('Invio messaggio:', type, data);
+            this.socket.send(JSON.stringify({ type, data }));
         } else {
             this.showStatus('Non connesso al server', 'error');
         }
     }
 
     createGame(playerName) {
-        // Se l'utente è autenticato, usa il nome dal login
-        const finalPlayerName = this.isAuthenticated ? this.playerName : playerName.trim();
-        
-        if (!finalPlayerName) {
+        // Se l'utente è autenticato, invia comunque il nome
+        const nameToSend = this.isAuthenticated ? this.playerName : playerName?.trim();
+        if (!nameToSend) {
             this.showStatus('Inserisci un nome valido', 'error');
             return;
         }
-
-        this.playerName = finalPlayerName;
-        this.sendMessage('create-game', { playerName: this.playerName });
+        this.sendMessage('create-game', { playerName: nameToSend });
     }
 
     joinGame(playerName, gameId) {
-        // Se l'utente è autenticato, usa il nome dal login
-        const finalPlayerName = this.isAuthenticated ? this.playerName : playerName.trim();
-        
-        if (!finalPlayerName || !gameId.trim()) {
-            this.showStatus('Inserisci nome e ID partita', 'error');
+        if (!gameId?.trim()) {
+            this.showStatus('Inserisci l\'ID partita', 'error');
             return;
         }
-
-        this.playerName = finalPlayerName;
-        this.sendMessage('join-game', { 
-            playerName: this.playerName, 
-            gameId: gameId.trim() 
-        });
+        // Se l'utente è autenticato, invia comunque il nome
+        const nameToSend = this.isAuthenticated ? this.playerName : playerName?.trim();
+        if (!nameToSend) {
+            this.showStatus('Inserisci un nome valido', 'error');
+            return;
+        }
+        this.sendMessage('join-game', { playerName: nameToSend, gameId: gameId.trim() });
     }
 
     leaveGame() {
@@ -207,7 +200,7 @@ class LudoClient {
         
         this.showGameInfo();
         this.updateGameDisplay();
-        this.showStatus(`Partita creata! ID: ${this.gameId}`, 'success');
+        this.showStatus(`Partita creata! ID: ${this.gameId}. Servono 4 giocatori per iniziare.`, 'success');
     }
 
     handleGameJoined(data) {
@@ -217,12 +210,24 @@ class LudoClient {
         
         this.showGameInfo();
         this.updateGameDisplay();
-        this.showStatus('Sei entrato nella partita!', 'success');
+        
+        // Mostra messaggio personalizzato in base al numero di giocatori
+        const playerCount = this.gameState.players.length;
+        if (playerCount === 4) {
+            this.showStatus('Sei entrato nella partita! Tutti i giocatori sono pronti.', 'success');
+        } else {
+            this.showStatus(`Sei entrato nella partita! Giocatori: ${playerCount}/4`, 'success');
+        }
     }
 
     handleGameUpdated(data) {
         this.gameState = data.gameState;
         this.updateGameDisplay();
+        
+        // Mostra messaggio se fornito dal server
+        if (data.message) {
+            this.showStatus(data.message, 'info');
+        }
     }
 
     handleGameStarted(data) {
@@ -257,15 +262,12 @@ class LudoClient {
 
     async updateGameStats(won) {
         try {
-            const response = await fetch('/api/update-game-stats', {
+            // Usa authManager per la richiesta autenticata
+            const response = await authManager.authenticatedFetch('/api/update-game-stats', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
                 body: JSON.stringify({ won })
             });
-            
+
             if (response.ok) {
                 console.log('Statistiche aggiornate con successo');
             }
@@ -304,7 +306,8 @@ class LudoClient {
     }
 
     showGameBoard() {
-        window.location.href = 'gioca.html';
+        // Passa gameId e playerId nell'URL
+        window.location.href = `gioca.html?gameId=${this.gameId}&playerId=${this.playerId}`;
     }
 
     updateGameDisplay() {
@@ -312,7 +315,7 @@ class LudoClient {
 
         // Aggiorna info partita
         document.getElementById('currentGameId').textContent = this.gameId;
-        document.getElementById('playerCount').textContent = this.gameState.players.length;
+        document.getElementById('playerCount').textContent = `${this.gameState.players.length}/4`;
 
         // Aggiorna lista giocatori con indicatore di autenticazione
         const playersList = document.getElementById('playersList');
@@ -333,12 +336,34 @@ class LudoClient {
             playersList.appendChild(li);
         });
 
-        // Mostra bottone start se sei il creatore e ci sono abbastanza giocatori
+        // Mostra informazioni sui giocatori mancanti
+        const playersNeeded = 4 - this.gameState.players.length;
+        if (playersNeeded > 0) {
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'players-info';
+            infoDiv.innerHTML = `
+                <p><strong>Servono ancora ${playersNeeded} giocatori per iniziare</strong></p>
+                <p>Condividi l'ID partita: <code>${this.gameId}</code></p>
+            `;
+            playersList.appendChild(infoDiv);
+        }
+
+        // Mostra bottone start solo se:
+        // 1. Sei il creatore (host)
+        // 2. Ci sono esattamente 4 giocatori
+        // 3. La partita è in attesa
         const startBtn = document.getElementById('startGameBtn');
         if (this.gameState.host === this.playerId && 
-            this.gameState.players.length >= 2 && 
+            this.gameState.players.length === 4 && 
             this.gameState.status === 'waiting') {
             startBtn.style.display = 'block';
+            startBtn.disabled = false;
+            startBtn.textContent = 'Inizia Partita';
+        } else if (this.gameState.host === this.playerId && 
+                   this.gameState.players.length < 4) {
+            startBtn.style.display = 'block';
+            startBtn.disabled = true;
+            startBtn.textContent = `Aspetta altri giocatori (${this.gameState.players.length}/4)`;
         } else {
             startBtn.style.display = 'none';
         }
@@ -462,6 +487,8 @@ function rollDice() {
 // Inizializza il client quando la pagina è caricata
 window.onload = function () {
     ludoClient = new LudoClient();
+    // Imposta la modalità di autenticazione all'avvio
+    authManager.setAuthMode(true); // true = sessionStorage, false = cookie
 };
 
 // Gestione chiusura finestra
