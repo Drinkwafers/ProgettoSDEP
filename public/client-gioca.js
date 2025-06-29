@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'game-started': onStart(msg.data.gameState, msg.data.color); break;
       case 'dice-thrown': onDice(msg.data); break;
       case 'piece-moved': onMove(msg.data.gameState); break;
+      case 'piece-eaten': onPieceEaten(msg.data); break;
       case 'game-finished': onFinish(msg.data); break;
       case 'error': return alert(msg.message);
     }
@@ -32,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else playerColor=gameState.players.find(p=>p.id===playerId).color;
     inizialize();
   }
+  
   function inizialize(){
     dadoTirato=gameState.gameData.dadoTirato;
     dado=gameState.gameData.ultimoDado;
@@ -40,35 +42,154 @@ document.addEventListener('DOMContentLoaded', () => {
     renderInfo();
     bindCells();
   }
-  function renderPieces(){ document.querySelectorAll('td img').forEach(i=>i.remove());
-    gameState.players.forEach(pl=>pl.pedine.forEach(p=>{
-      const img=document.createElement('img'); img.src=`immagini/pedina-${pl.color}.png`;
+  
+  function renderPieces(){ 
+    document.querySelectorAll('td img').forEach(i=>i.remove());
+    gameState.players.forEach(pl=>pl.pedine.forEach((p,idx)=>{
+      const img=document.createElement('img'); 
+      img.src=`immagini/pedina-${pl.color}.png`;
+      img.dataset.pieceId = idx;
+      img.dataset.playerColor = pl.color;
+      
       let cell;
       if(p.posizione==='base') cell=document.querySelector(`.base-${pl.color}:not(:has(img))`);
       else if(p.posizione==='destinazione') cell=document.querySelector(`.casella-destinazione-${pl.color}-${p.casella}`);
       else cell=document.querySelector(`.casella-${p.casella}`);
       cell?.appendChild(img);
-    })); }
+    })); 
+  }
 
-  function bindCells(){ document.querySelectorAll('td:not([id*="bianco"])').forEach(cell=>{
+  function bindCells(){ 
+    document.querySelectorAll('td:not([id*="bianco"])').forEach(cell=>{
       cell.onclick=()=>{
         if(!isMyTurn) return alert('Non è il tuo turno');
         if(!dadoTirato) return alert('Tira il dado prima');
-        const img=cell.querySelector('img'); if(!img) return;
-        const col=img.src.includes('pedina-blu')?'blu':img.src.includes('rosso')?'rosso':img.src.includes('verde')?'verde':'giallo';
-        if(col!==playerColor) return alert('Non tua pedina');
-        const cls=cell.className;
-        const curr={ posizione: cls.includes('casella-')?'percorso':'base', casella:cls.includes('casella-')?parseInt(cls.split('-')[1]):null, pieceId:1 };
-        let np= curr.casella? ((curr.casella+dado-1)%40+1):1;
-        ws.send(JSON.stringify({ type:'move-piece', data:{ gameId, playerId, pieceId:curr.pieceId, newPosition:`percorso-${np}` } }));
+        
+        const img=cell.querySelector('img'); 
+        if(!img) return;
+        
+        const pieceColor = img.dataset.playerColor;
+        const pieceId = parseInt(img.dataset.pieceId);
+        
+        if(pieceColor !== playerColor) return alert('Non tua pedina');
+        
+        const currentPlayer = gameState.players.find(p => p.color === playerColor);
+        const piece = currentPlayer.pedine[pieceId];
+        
+        // Controlla se la pedina può muoversi
+        if(!canMovePiece(piece, dado)) {
+          return alert('Questa pedina non può muoversi');
+        }
+        
+        ws.send(JSON.stringify({ 
+          type:'move-piece', 
+          data:{ gameId, playerId, pieceId, currentPosition: piece } 
+        }));
       };
-    }); }
+    }); 
+  }
 
-  function onDice(d){ gameState=d.gameState; dado=d.diceResult; dadoTirato=true; isMyTurn=(d.playerColor===playerColor); alert(`Hai tirato ${dado}`); }
-  function onMove(gs){ gameState=gs; dadoTirato=false; isMyTurn=(gameState.turnoCorrente===playerColor); renderPieces(); renderInfo(); }
-  function onFinish(d){ alert(d.winner.id===playerId?'Hai vinto!':`Vince ${d.winner.name}`); }
+  function canMovePiece(piece, diceValue) {
+    // Se è in base, può uscire solo con 6 (o primo turno)
+    if(piece.posizione === 'base') {
+      const isFirstTurn = gameState.gameData.turnoNumero === 1;
+      return diceValue === 6 || isFirstTurn;
+    }
+    
+    // Se è nel percorso, controlla se può muoversi senza superare la destinazione
+    if(piece.posizione === 'percorso') {
+      const newPos = piece.casella + diceValue;
+      // Logica semplificata - in un gioco reale dovrebbe considerare il percorso specifico per colore
+      return newPos <= 40;
+    }
+    
+    return true;
+  }
 
-  function renderInfo(){ let info=document.getElementById('game-info'); if(!info){ info=document.createElement('div'); info.id='game-info'; document.body.appendChild(info);} info.innerHTML=`Giocatore:${playerColor.toUpperCase()}<br>Turno:${gameState.turnoCorrente.toUpperCase()}<br>Ultimo dado:${dado}`; }
+  function onDice(d){ 
+    gameState=d.gameState; 
+    dado=d.diceResult; 
+    dadoTirato=true; 
+    isMyTurn=(d.playerColor===playerColor); 
+    
+    const message = `Hai tirato ${dado}`;
+    const canMove = checkIfCanMove();
+    
+    if(!canMove && isMyTurn) {
+      alert(message + ' - Nessuna mossa possibile, turno passato');
+      // Auto-passa il turno se non ci sono mosse possibili
+      setTimeout(() => {
+        ws.send(JSON.stringify({ 
+          type:'skip-turn', 
+          data:{ gameId, playerId } 
+        }));
+      }, 1000);
+    } else {
+      alert(message);
+    }
+  }
+  
+  function checkIfCanMove() {
+    const currentPlayer = gameState.players.find(p => p.color === playerColor);
+    return currentPlayer.pedine.some(piece => canMovePiece(piece, dado));
+  }
+  
+  function onMove(gs){ 
+    gameState=gs; 
+    dadoTirato=false; 
+    isMyTurn=(gameState.turnoCorrente===playerColor); 
+    renderPieces(); 
+    renderInfo(); 
+  }
+  
+  function onPieceEaten(data) {
+    gameState = data.gameState;
+    const eatenPlayer = gameState.players.find(p => p.id === data.eatenPlayerId);
+    const eaterPlayer = gameState.players.find(p => p.id === data.eaterPlayerId);
+    
+    if(data.eatenPlayerId === playerId) {
+      alert(`La tua pedina ${data.eatenColor} è stata mangiata da ${eaterPlayer.name}!`);
+    } else if(data.eaterPlayerId === playerId) {
+      alert(`Hai mangiato la pedina ${data.eatenColor} di ${eatenPlayer.name}!`);
+    } else {
+      alert(`${eaterPlayer.name} ha mangiato una pedina di ${eatenPlayer.name}`);
+    }
+    
+    renderPieces();
+    renderInfo();
+  }
+  
+  function onFinish(d){ 
+    alert(d.winner.id===playerId?'Hai vinto!':`Vince ${d.winner.name}`); 
+  }
 
-  window.tiraDado=()=>{ if(!isMyTurn) return alert('Non è il tuo turno'); if(dadoTirato) return alert('Dado già tirato'); ws.send(JSON.stringify({type:'throw-dice',data:{gameId,playerId}})); };
+  function renderInfo(){ 
+    let info=document.getElementById('game-info'); 
+    if(!info){ 
+      info=document.createElement('div'); 
+      info.id='game-info'; 
+      document.body.appendChild(info);
+    } 
+    
+    const currentPlayer = gameState.players.find(p => p.color === playerColor);
+    const piecesInBase = currentPlayer.pedine.filter(p => p.posizione === 'base').length;
+    const piecesInPlay = currentPlayer.pedine.filter(p => p.posizione === 'percorso').length;
+    const piecesFinished = currentPlayer.pedine.filter(p => p.posizione === 'destinazione').length;
+    
+    info.innerHTML=`
+      Giocatore: ${playerColor.toUpperCase()}<br>
+      Turno: ${gameState.turnoCorrente.toUpperCase()}<br>
+      Ultimo dado: ${dado}<br>
+      Turno n°: ${gameState.gameData.turnoNumero || 1}<br>
+      Pedine in base: ${piecesInBase}<br>
+      Pedine in gioco: ${piecesInPlay}<br>
+      Pedine arrivate: ${piecesFinished}
+    `; 
+  }
+
+  window.tiraDado=()=>{ 
+    if(!isMyTurn) return alert('Non è il tuo turno'); 
+    if(dadoTirato) return alert('Dado già tirato'); 
+    ws.send(JSON.stringify({type:'throw-dice',data:{gameId,playerId}})); 
+  };
 });

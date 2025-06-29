@@ -1,105 +1,103 @@
-body
-{
-    display: inline-flex;
-    align-items: center;
+body {
+    margin: 0;
+    padding: 20px;
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
 }
 
-td
-{
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+td {
     border: 1px solid black;
     width: 4em;
     height: 4em;
-    box-sizing: border-box;  /* non conta il padding */
+    box-sizing: border-box;
     text-align: center;
 }
 
-table
-{
+table {
     border-collapse: collapse;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-#bianco
-{
+#bianco {
     border: none;
     padding: 0;
 }
-#finale-blu
-{
+
+#finale-blu {
     background-color: #27a7fe;
 }
 
-#finale-rosso
-{
+#finale-rosso {
     background-color: #ec2724;
 }
 
-#finale-verde
-{
+#finale-verde {
     background-color: #6fc639;
 }
 
-#finale-giallo
-{
+#finale-giallo {
     background-color: #fbd12b;
 }
 
-#cammino, #freccia-blu, #freccia-rosso, #freccia-giallo, #freccia-verde
-{
+#cammino, #freccia-blu, #freccia-rosso, #freccia-giallo, #freccia-verde {
     background-color: #f2f2f2;
 }
 
-img
-{
+img {
     width: 3.5em;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+img:hover {
+    transform: scale(1.1);
 }
 
 /* Effetto per il turno attivo */
-.turno-attivo
-{
+.turno-attivo {
     box-shadow: 0 0 10px 3px gold;
     animation: pulse 2s infinite;
 }
 
-@keyframes pulse
-{
+@keyframes pulse {
     0% { box-shadow: 0 0 10px 3px gold; }
     50% { box-shadow: 0 0 20px 5px gold; }
     100% { box-shadow: 0 0 10px 3px gold; }
 }
 
-/* Rimuovi l'effetto fisso dalla base blu */
-.base-blu
-{
+.base-blu {
     background-color: #27a7fe;
 }
 
-.base-rosso
-{
+.base-rosso {
     background-color: #ec2724;
 }
 
-.base-verde
-{
+.base-verde {
     background-color: #6fc639;
 }
 
-.base-giallo
-{
+.base-giallo {
     background-color: #fbd12b;
 }
 
-.linea-orizzontale, .linea-verticale
-{
+.linea-orizzontale, .linea-verticale {
     border-bottom: 2px solid black;
 }
 
-.linea-verticale
-{
+.linea-verticale {
     rotate: 90deg;
 }
 
-.griglia
-{
+.griglia {
     border: none;
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -108,65 +106,116 @@ img
     padding: 0;
 }
 
-.freccia-orizzontale
-{
+.freccia-orizzontale {
     border-top: 2px solid black;
 }
-.freccia-orizzontale2
-{
+
+.freccia-orizzontale2 {
     border-top: 2px solid black;
     rotate: 180deg;
 }
-.freccia-oriz
-{
+
+.freccia-oriz {
     border-top: 1px solid black;
     rotate: 180deg;
 }
-.freccia-zontale
-{
+
+.freccia-zontale {
     border-top: 1px solid black;
 }
-.freccia-verticale
-{
+
+.freccia-verticale {
     border-top: 2px solid black;
     rotate: -90deg;
 }
-.freccia-verticale2
-{
+
+.freccia-verticale2 {
     border-top: 2px solid black;
     rotate: 90deg;
 }
-.freccia-vert
-{
+
+.freccia-vert {
     border-top: 1px solid black;
     rotate: 90deg;
 }
-.freccia-icale
-{
+
+.freccia-icale {
     border-top: 1px solid black;
     rotate: -90deg;
 }
 
-#freccia-blu
-{
+#freccia-blu {
     background-image: url(immagini/freccia-blu.png);
     background-size: cover;
 }
 
-#freccia-verde
-{
+#freccia-verde {
     background-image: url(immagini/freccia-verde.png);
     background-size: cover;
 }
 
-#freccia-rosso
-{
+#freccia-rosso {
     background-image: url(immagini/freccia-rosso.png);
     background-size: cover;
 }
 
-#freccia-giallo
-{
+#freccia-giallo {
     background-image: url(immagini/freccia-giallo.png);
     background-size: cover;
+}
+
+/* Stili per i controlli */
+.controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+#dado-button {
+    background: linear-gradient(145deg, #ff6b6b, #ee5a52);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#dado-button:hover {
+    background: linear-gradient(145deg, #ee5a52, #ff6b6b);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+}
+
+#dado-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(255,107,107,0.3);
+}
+
+#dado-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Info di gioco */
+#game-info {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    font-weight: bold;
+    text-align: center;
+    min-width: 200px;
+}
+
+#game-info br {
+    margin: 5px 0;
 }

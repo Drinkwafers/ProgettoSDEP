@@ -83,7 +83,11 @@ wss.on('connection', ws => {
         const gameState = {
             players: [playerEntry],
             host: playerId,
-            gameData: {},
+            gameData: {
+                turnoNumero: 1,
+                dadoTirato: false,
+                ultimoDado: 0
+            },
             status: 'waiting'
         };
 
@@ -146,14 +150,18 @@ wss.on('connection', ws => {
       const { gameId } = msg.data;
       const game = games[gameId];
       if (!game || game.players.length !== 4) return ws.send(JSON.stringify({ type: 'error', message: 'Serve 4 giocatori' }));
+      
       // Assegna colori e pedine
       const colors = ['blu','rosso','verde','giallo'];
       game.players.forEach((p,i) => {
         p.color = colors[i];
-        p.pedine = Array(4).fill({ posizione:'base', casella:null });
+        p.pedine = Array(4).fill(0).map(() => ({ posizione:'base', casella:null }));
       });
+      
       game.turnoCorrente = colors[0];
       game.status = 'playing';
+      game.gameData.turnoNumero = 1;
+      
       // Broadcast start
       game.players.forEach(p => {
         playerSockets[p.id]?.send(JSON.stringify({ type: 'game-started', data: { gameState: game, color: p.color } }));
@@ -166,40 +174,202 @@ wss.on('connection', ws => {
       const { gameId, playerId } = msg.data;
       const game = games[gameId];
       if (!game) return;
+      
       const player = game.players.find(p=>p.id===playerId);
       if (game.turnoCorrente !== player.color) return ws.send(JSON.stringify({ type: 'error', message: 'Non è il tuo turno' }));
+      
       const roll = Math.floor(Math.random()*6)+1;
       game.gameData.ultimoDado = roll;
       game.gameData.dadoTirato = true;
-      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'dice-thrown', data:{ gameState:game, diceResult:roll, playerColor:p.color } })));      
+      
+      // Broadcast dice result
+      game.players.forEach(p => {
+        playerSockets[p.id]?.send(JSON.stringify({ 
+          type:'dice-thrown', 
+          data:{ 
+            gameState:game, 
+            diceResult:roll, 
+            playerColor:p.color 
+          } 
+        }));
+      });
+      
+      return;
+    }
+
+    // Skip turn (quando non ci sono mosse possibili)
+    if (msg.type === 'skip-turn') {
+      const { gameId, playerId } = msg.data;
+      const game = games[gameId];
+      if (!game) return;
+      
+      const player = game.players.find(p=>p.id===playerId);
+      if (game.turnoCorrente !== player.color) return;
+      
+      // Passa al prossimo turno
+      advanceTurn(game);
+      
+      // Broadcast update
+      game.players.forEach(p => {
+        playerSockets[p.id]?.send(JSON.stringify({ 
+          type:'piece-moved', 
+          data:{ gameState:game } 
+        }));
+      });
+      
       return;
     }
 
     // Muovi pedina
     if (msg.type === 'move-piece') {
-      const { gameId, playerId, pieceId, newPosition } = msg.data;
+      const { gameId, playerId, pieceId, currentPosition } = msg.data;
       const game = games[gameId];
       if (!game) return;
+      
       const player = game.players.find(p=>p.id===playerId);
-      if (game.turnoCorrente!==player.color || !game.gameData.dadoTirato) return ws.send(JSON.stringify({ type:'error', message:'Azione non valida' }));
-      const [type, idx] = newPosition.split('-');
-      player.pedine[pieceId-1] = { posizione:type, casella:parseInt(idx,10) };
+      if (game.turnoCorrente!==player.color || !game.gameData.dadoTirato) {
+        return ws.send(JSON.stringify({ type:'error', message:'Azione non valida' }));
+      }
+      
+      const piece = player.pedine[pieceId];
+      const diceValue = game.gameData.ultimoDado;
+      
+      // Verifica se la mossa è valida
+      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero)) {
+        return ws.send(JSON.stringify({ type:'error', message:'Mossa non valida' }));
+      }
+      
+      // Calcola nuova posizione
+      const newPosition = calculateNewPosition(piece, diceValue, player.color);
+      
+      // Controlla se c'è una pedina da mangiare
+      const eatenPiece = checkForEating(game, newPosition, player.color);
+      
+      // Muovi la pedina
+      player.pedine[pieceId] = newPosition;
+      
+      // Se ha mangiato una pedina
+      if (eatenPiece) {
+        // Rimanda la pedina mangiata alla base
+        eatenPiece.player.pedine[eatenPiece.pieceIndex] = { posizione: 'base', casella: null };
+        
+        // Notifica che una pedina è stata mangiata
+        game.players.forEach(p => {
+          playerSockets[p.id]?.send(JSON.stringify({ 
+            type:'piece-eaten', 
+            data:{ 
+              gameState: game,
+              eaterPlayerId: playerId,
+              eatenPlayerId: eatenPiece.player.id,
+              eatenColor: eatenPiece.player.color,
+              position: newPosition.casella
+            } 
+          }));
+        });
+      }
+      
       game.gameData.dadoTirato = false;
-      // Avanza turno
-      const i = game.players.findIndex(p=>p.id===playerId);
-      game.turnoCorrente = game.players[(i+1)%game.players.length].color;
+      
+      // Se ha fatto 6, può tirare di nuovo, altrimenti avanza turno
+      if (diceValue !== 6) {
+        advanceTurn(game);
+      }
+      
       // Broadcast move
-      game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'piece-moved', data:{ gameState:game } })));
+      game.players.forEach(p => {
+        playerSockets[p.id]?.send(JSON.stringify({ 
+          type:'piece-moved', 
+          data:{ gameState:game } 
+        }));
+      });
+      
       // Verifica vittoria
-      if (player.pedine.every(pd=>pd.posizione==='destinazione')) {
-        game.status='finished';
-        game.players.forEach(p => playerSockets[p.id]?.send(JSON.stringify({ type:'game-finished', data:{ gameState:game, winner:player } })));
+      if (player.pedine.every(pd => pd.posizione === 'destinazione')) {
+        game.status = 'finished';
+        game.players.forEach(p => {
+          playerSockets[p.id]?.send(JSON.stringify({ 
+            type:'game-finished', 
+            data:{ gameState:game, winner:player } 
+          }));
+        });
         delete games[gameId];
       }
+      
       return;
     }
-
-    // Leave e close
   });
 });
+
+// Funzioni helper
+
+function canMovePiece(piece, diceValue, turnNumber) {
+  // Se è in base, può uscire solo con 6 o al primo turno
+  if (piece.posizione === 'base') {
+    return diceValue === 6 || turnNumber === 1;
+  }
+  
+  // Se è nel percorso, può sempre muoversi (logica semplificata)
+  if (piece.posizione === 'percorso') {
+    return true;
+  }
+  
+  return true;
+}
+
+function calculateNewPosition(piece, diceValue, playerColor) {
+  if (piece.posizione === 'base') {
+    // Esce dalla base e va alla casella di partenza del suo colore
+    const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
+    return { posizione: 'percorso', casella: startPositions[playerColor] };
+  }
+  
+  if (piece.posizione === 'percorso') {
+    let newCasella = piece.casella + diceValue;
+    
+    // Gestione del percorso circolare (40 caselle)
+    if (newCasella > 40) {
+      newCasella = newCasella - 40;
+    }
+    
+    // Logica semplificata - in un gioco reale dovrebbe gestire l'entrata nella zona di destinazione
+    // Per ora manteniamo tutto nel percorso principale
+    return { posizione: 'percorso', casella: newCasella };
+  }
+  
+  return piece;
+}
+
+function checkForEating(game, newPosition, currentPlayerColor) {
+  if (newPosition.posizione !== 'percorso') return null;
+  
+  // Cerca se c'è una pedina di un altro giocatore nella nuova posizione
+  for (let player of game.players) {
+    if (player.color === currentPlayerColor) continue;
+    
+    for (let i = 0; i < player.pedine.length; i++) {
+      const piece = player.pedine[i];
+      if (piece.posizione === 'percorso' && piece.casella === newPosition.casella) {
+        return {
+          player: player,
+          pieceIndex: i,
+          piece: piece
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+function advanceTurn(game) {
+  const currentIndex = game.players.findIndex(p => p.color === game.turnoCorrente);
+  const nextIndex = (currentIndex + 1) % game.players.length;
+  game.turnoCorrente = game.players[nextIndex].color;
+  
+  // Se è tornato al primo giocatore, incrementa il numero del turno
+  if (nextIndex === 0) {
+    game.gameData.turnoNumero = (game.gameData.turnoNumero || 1) + 1;
+  }
+}
+
 server.listen(PORT, () => console.log(`WS server listening on ${PORT}`));
