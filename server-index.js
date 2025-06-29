@@ -235,15 +235,18 @@ wss.on('connection', ws => {
       const diceValue = game.gameData.ultimoDado;
       
       // Verifica se la mossa è valida
-      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero)) {
+      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero, player.color)) {
         return ws.send(JSON.stringify({ type:'error', message:'Mossa non valida' }));
       }
       
       // Calcola nuova posizione
       const newPosition = calculateNewPosition(piece, diceValue, player.color);
       
-      // Controlla se c'è una pedina da mangiare
-      const eatenPiece = checkForEating(game, newPosition, player.color);
+      // Controlla se c'è una pedina da mangiare (solo se rimane nel percorso)
+      let eatenPiece = null;
+      if (newPosition.posizione === 'percorso') {
+        eatenPiece = checkForEating(game, newPosition, player.color);
+      }
       
       // Muovi la pedina
       player.pedine[pieceId] = newPosition;
@@ -302,15 +305,25 @@ wss.on('connection', ws => {
 
 // Funzioni helper
 
-function canMovePiece(piece, diceValue, turnNumber) {
+function canMovePiece(piece, diceValue, turnNumber, playerColor) {
   // Se è in base, può uscire solo con 6 o al primo turno
   if (piece.posizione === 'base') {
     return diceValue === 6 || turnNumber === 1;
   }
   
-  // Se è nel percorso, può sempre muoversi (logica semplificata)
+  // Se è nel percorso, controlla se può muoversi
   if (piece.posizione === 'percorso') {
+    const newPosition = calculateNewPosition(piece, diceValue, playerColor);
+    // Se va in destinazione, controlla che non superi le 4 caselle
+    if (newPosition.posizione === 'destinazione') {
+      return newPosition.casella <= 4;
+    }
     return true;
+  }
+  
+  // Se è già in destinazione, può muoversi solo se non supera la casella 4
+  if (piece.posizione === 'destinazione') {
+    return piece.casella + diceValue <= 4;
   }
   
   return true;
@@ -326,14 +339,67 @@ function calculateNewPosition(piece, diceValue, playerColor) {
   if (piece.posizione === 'percorso') {
     let newCasella = piece.casella + diceValue;
     
+    // Definisci le caselle di ingresso alla zona destinazione per ogni colore
+    const homeEntrances = { 
+      blu: 40,    // Il blu entra in destinazione dalla casella 40
+      rosso: 10,  // Il rosso entra in destinazione dalla casella 10
+      verde: 20,  // Il verde entra in destinazione dalla casella 20
+      giallo: 30  // Il giallo entra in destinazione dalla casella 30
+    };
+    
+    const homeEntrance = homeEntrances[playerColor];
+    
     // Gestione del percorso circolare (40 caselle)
     if (newCasella > 40) {
       newCasella = newCasella - 40;
     }
     
-    // Logica semplificata - in un gioco reale dovrebbe gestire l'entrata nella zona di destinazione
-    // Per ora manteniamo tutto nel percorso principale
+    // Controlla se la pedina dovrebbe entrare nella zona di destinazione
+    // Questo accade quando la pedina passa attraverso o si ferma sulla casella di ingresso
+    const originalCasella = piece.casella;
+    
+    // Calcola se nel movimento attraversa la casella di ingresso
+    let crossesHome = false;
+    if (originalCasella <= homeEntrance && newCasella >= homeEntrance) {
+      crossesHome = true;
+    } else if (originalCasella > homeEntrance && (newCasella + 40) >= (homeEntrance + 40)) {
+      // Caso in cui attraversa lo 0 (da 39 a 1, per esempio)
+      crossesHome = true;
+    }
+    
+    if (crossesHome) {
+      // Calcola quanto oltrepassa la casella di ingresso
+      let stepsIntoHome;
+      if (originalCasella <= homeEntrance) {
+        stepsIntoHome = newCasella - homeEntrance;
+      } else {
+        // Caso attraversamento dello 0
+        stepsIntoHome = (newCasella + 40) - (homeEntrance + 40);
+      }
+      
+      // Se i passi sono 0 o positivi, entra nella destinazione
+      if (stepsIntoHome >= 0) {
+        const destinationSlot = stepsIntoHome + 1; // Le caselle destinazione vanno da 1 a 4
+        if (destinationSlot <= 4) {
+          return { posizione: 'destinazione', casella: destinationSlot };
+        } else {
+          // Se supererebbe la destinazione, rimane nel percorso
+          return { posizione: 'percorso', casella: newCasella };
+        }
+      }
+    }
+    
     return { posizione: 'percorso', casella: newCasella };
+  }
+  
+  if (piece.posizione === 'destinazione') {
+    const newDestinationSlot = piece.casella + diceValue;
+    if (newDestinationSlot <= 4) {
+      return { posizione: 'destinazione', casella: newDestinationSlot };
+    } else {
+      // Non può muoversi se supererebbe la casella 4
+      return piece;
+    }
   }
   
   return piece;
