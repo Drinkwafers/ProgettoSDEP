@@ -96,14 +96,89 @@ document.addEventListener('DOMContentLoaded', () => {
       return diceValue === 6 || isFirstTurn;
     }
     
-    // Se è nel percorso, controlla se può muoversi senza superare la destinazione
+    // Se è nel percorso, controlla se può muoversi
     if(piece.posizione === 'percorso') {
-      const newPos = piece.casella + diceValue;
-      // Logica semplificata - in un gioco reale dovrebbe considerare il percorso specifico per colore
-      return newPos <= 40;
+      // Simula il calcolo della nuova posizione per verificare se è valida
+      const newPosition = calculateNewPositionClient(piece, diceValue, playerColor);
+      if (newPosition.posizione === 'destinazione') {
+        return newPosition.casella <= 4;
+      }
+      return true;
+    }
+    
+    // Se è già in destinazione, può muoversi solo se non supera la casella 4
+    if(piece.posizione === 'destinazione') {
+      return piece.casella + diceValue <= 4;
     }
     
     return true;
+  }
+
+  function calculateNewPositionClient(piece, diceValue, playerColor) {
+    if (piece.posizione === 'base') {
+      const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
+      return { posizione: 'percorso', casella: startPositions[playerColor] };
+    }
+    
+    if (piece.posizione === 'percorso') {
+      let newCasella = piece.casella + diceValue;
+      
+      // Definisci le caselle di ingresso alla zona destinazione per ogni colore
+      const homeEntrances = { 
+        blu: 40,
+        rosso: 10,
+        verde: 20,
+        giallo: 30
+      };
+      
+      const homeEntrance = homeEntrances[playerColor];
+      
+      // Gestione del percorso circolare (40 caselle)
+      if (newCasella > 40) {
+        newCasella = newCasella - 40;
+      }
+      
+      // Controlla se la pedina dovrebbe entrare nella zona di destinazione
+      const originalCasella = piece.casella;
+      
+      let crossesHome = false;
+      if (originalCasella <= homeEntrance && newCasella >= homeEntrance) {
+        crossesHome = true;
+      } else if (originalCasella > homeEntrance && (newCasella + 40) >= (homeEntrance + 40)) {
+        crossesHome = true;
+      }
+      
+      if (crossesHome) {
+        let stepsIntoHome;
+        if (originalCasella <= homeEntrance) {
+          stepsIntoHome = newCasella - homeEntrance;
+        } else {
+          stepsIntoHome = (newCasella + 40) - (homeEntrance + 40);
+        }
+        
+        if (stepsIntoHome >= 0) {
+          const destinationSlot = stepsIntoHome + 1;
+          if (destinationSlot <= 4) {
+            return { posizione: 'destinazione', casella: destinationSlot };
+          } else {
+            return { posizione: 'percorso', casella: newCasella };
+          }
+        }
+      }
+      
+      return { posizione: 'percorso', casella: newCasella };
+    }
+    
+    if (piece.posizione === 'destinazione') {
+      const newDestinationSlot = piece.casella + diceValue;
+      if (newDestinationSlot <= 4) {
+        return { posizione: 'destinazione', casella: newDestinationSlot };
+      } else {
+        return piece;
+      }
+    }
+    
+    return piece;
   }
 
   function onDice(d){ 
