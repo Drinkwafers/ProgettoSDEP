@@ -77,7 +77,7 @@ wss.on('connection', ws => {
             color: null,
             pedine: [],
             isAuthenticated: Boolean(isAuth),
-            userId: isAuth ? ws.user.userId : null
+            userId: isAuth ? ws.user.userId : null,  haPedinaUscitaDallaBase: 0
         };
 
         const gameState = {
@@ -178,7 +178,13 @@ wss.on('connection', ws => {
       const player = game.players.find(p=>p.id===playerId);
       if (game.turnoCorrente !== player.color) return ws.send(JSON.stringify({ type: 'error', message: 'Non è il tuo turno' }));
       
-      const roll = Math.floor(Math.random()*6)+1;
+      roll = Math.floor(Math.random()*4);
+      if (player.haPedinaUscitaDallaBase)
+      {
+        roll += 3
+        player.haPedinaUscitaDallaBase = 0; // Reset dopo il primo lancio
+      } else roll += 1
+
       game.gameData.ultimoDado = roll;
       game.gameData.dadoTirato = true;
       
@@ -241,6 +247,8 @@ wss.on('connection', ws => {
       
       // Calcola nuova posizione
       const newPosition = calculateNewPosition(piece, diceValue, player.color);
+      if (piece.posizione === 'base')
+        player.haPedinaUscitaDallaBase = 1;
       
       // Controlla se c'è una pedina da mangiare (solo se rimane nel percorso)
       let eatenPiece = null;
