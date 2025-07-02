@@ -178,12 +178,12 @@ wss.on('connection', ws => {
       const player = game.players.find(p=>p.id===playerId);
       if (game.turnoCorrente !== player.color) return ws.send(JSON.stringify({ type: 'error', message: 'Non è il tuo turno' }));
       
-      roll = Math.floor(Math.random()*4);
+      
       if (player.haPedinaUscitaDallaBase)
       {
-        roll += 3
+        roll = Math.floor(Math.random()*4) + 3; 
         player.haPedinaUscitaDallaBase = 0; // Reset dopo il primo lancio
-      } else roll += 1
+      } else roll = Math.floor(Math.random()*6) + 1;
 
       game.gameData.ultimoDado = roll;
       game.gameData.dadoTirato = true;
