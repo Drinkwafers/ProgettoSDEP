@@ -1,4 +1,5 @@
 // client-index.js - JavaScript per il client Ludo con supporto autenticazione
+// ✅ MODIFICATO: Si connette al server lobby (porta 3001)
 class LudoClient {
     constructor() {
         this.socket = null;
@@ -60,12 +61,14 @@ class LudoClient {
 
     initializeConnection() {
         try {
+            // ✅ CAMBIATO: Connessione al server lobby (porta 3001)
             this.socket = new WebSocket('ws://localhost:3001');
 
             this.socket.onopen = () => {
-                console.log('Connessione WebSocket aperta');
+                console.log('🏠 Connessione WebSocket lobby aperta');
                 this.isConnected = true;
-                this.showStatus('Connesso al server', 'success');
+                this.showStatus('Connesso al server lobby', 'success');
+                
                 // INVIA IL TOKEN JWT SE PRESENTE (sessionStorage)
                 if (authManager.useSessionStorage) {
                     const token = authManager.getAuthToken();
@@ -80,23 +83,23 @@ class LudoClient {
             };
 
             this.socket.onclose = () => {
-                console.log('Connessione chiusa');
+                console.log('Connessione lobby chiusa');
                 this.isConnected = false;
-                this.showStatus('Connessione al server persa', 'error');
+                this.showStatus('Connessione al server lobby persa', 'error');
             };
 
             this.socket.onerror = (error) => {
-                console.error('Errore WebSocket:', error);
-                this.showStatus('Errore di connessione al server', 'error');
+                console.error('Errore WebSocket lobby:', error);
+                this.showStatus('Errore di connessione al server lobby', 'error');
             };
         } catch (error) {
-            console.error('Errore inizializzazione:', error);
-            this.showStatus('Impossibile connettersi al server', 'error');
+            console.error('Errore inizializzazione lobby:', error);
+            this.showStatus('Impossibile connettersi al server lobby', 'error');
         }
     }
 
     handleMessage(message) {
-        console.log('Messaggio ricevuto:', message);
+        console.log('📨 Messaggio lobby ricevuto:', message);
         
         switch (message.type) {
             case 'game-created':
@@ -111,15 +114,6 @@ class LudoClient {
             case 'game-started':
                 this.handleGameStarted(message.data);
                 break;
-            case 'game-finished':
-                this.handleGameFinished(message.data);
-                break;
-            case 'player-turn':
-                this.handlePlayerTurn(message.data);
-                break;
-            case 'dice-rolled':
-                this.handleDiceRolled(message.data);
-                break;
             case 'error':
                 this.showStatus(message.message, 'error');
                 break;
@@ -131,10 +125,10 @@ class LudoClient {
 
     sendMessage(type, data = {}) {
         if (this.socket && this.isConnected) {
-            console.log('Invio messaggio:', type, data);
+            console.log('📤 Invio messaggio lobby:', type, data);
             this.socket.send(JSON.stringify({ type, data }));
         } else {
-            this.showStatus('Non connesso al server', 'error');
+            this.showStatus('Non connesso al server lobby', 'error');
         }
     }
 
@@ -178,21 +172,6 @@ class LudoClient {
         }
     }
 
-    rollDice() {
-        if (this.gameId && this.canRoll()) {
-            this.sendMessage('roll-dice', { 
-                gameId: this.gameId, 
-                playerId: this.playerId 
-            });
-        }
-    }
-
-    canRoll() {
-        return this.gameState && 
-               this.gameState.currentPlayer === this.playerId && 
-               this.gameState.status === 'playing';
-    }
-
     handleGameCreated(data) {
         this.gameId = data.gameId;
         this.playerId = data.playerId;
@@ -232,31 +211,21 @@ class LudoClient {
 
     handleGameStarted(data) {
         this.gameState = data.gameState;
-        this.showGameBoard();
-        this.updateGameDisplay();
-        this.showStatus('Partita iniziata!', 'success');
-    }
-
-    handleGameFinished(data) {
-        this.gameState = data.gameState;
-        const { winner, rankings } = data;
         
-        // Mostra risultato partita
-        let resultMessage = `Partita terminata! `;
-        if (winner.id === this.playerId) {
-            resultMessage += `🎉 HAI VINTO! 🎉`;
-            if (this.isAuthenticated) {
-                resultMessage += ` Le tue statistiche sono state aggiornate.`;
-            }
+        console.log('🚀 Partita iniziata! Redirect al gameplay...');
+        this.showStatus('Partita iniziata! Reindirizzamento...', 'success');
+        
+        // ✅ CAMBIATO: Usa l'URL di redirect fornito dal server
+        if (data.redirectUrl) {
+            // Piccolo delay per mostrare il messaggio
+            setTimeout(() => {
+                window.location.href = data.redirectUrl;
+            }, 1000);
         } else {
-            resultMessage += `Ha vinto: ${winner.name}`;
-        }
-        
-        this.showStatus(resultMessage, winner.id === this.playerId ? 'success' : 'info');
-        
-        // Aggiorna le statistiche se l'utente è autenticato
-        if (this.isAuthenticated) {
-            this.updateGameStats(winner.id === this.playerId);
+            // Fallback al metodo originale
+            setTimeout(() => {
+                window.location.href = `gioca.html?gameId=${this.gameId}&playerId=${this.playerId}`;
+            }, 1000);
         }
     }
 
@@ -276,38 +245,9 @@ class LudoClient {
         }
     }
 
-    handlePlayerTurn(data) {
-        this.gameState = data.gameState;
-        this.updateCurrentPlayerDisplay();
-        
-        if (data.gameState.currentPlayer === this.playerId) {
-            this.showStatus('È il tuo turno! Clicca il dado', 'info');
-        } else {
-            const currentPlayerName = this.getCurrentPlayerName();
-            this.showStatus(`Turno di ${currentPlayerName}`, 'info');
-        }
-    }
-
-    handleDiceRolled(data) {
-        this.gameState = data.gameState;
-        this.updateDiceDisplay(data.diceValue);
-        
-        if (data.playerId === this.playerId) {
-            this.showStatus(`Hai tirato: ${data.diceValue}`, 'success');
-        } else {
-            const playerName = this.getPlayerName(data.playerId);
-            this.showStatus(`${playerName} ha tirato: ${data.diceValue}`, 'info');
-        }
-    }
-
     showGameInfo() {
         document.getElementById('mainMenu').style.display = 'none';
         document.getElementById('gameInfo').classList.add('show');
-    }
-
-    showGameBoard() {
-        // Passa gameId e playerId nell'URL
-        window.location.href = `gioca.html?gameId=${this.gameId}&playerId=${this.playerId}`;
     }
 
     updateGameDisplay() {
@@ -367,40 +307,6 @@ class LudoClient {
         } else {
             startBtn.style.display = 'none';
         }
-
-        this.updateCurrentPlayerDisplay();
-    }
-
-    updateCurrentPlayerDisplay() {
-        if (this.gameState && this.gameState.status === 'playing') {
-            const currentPlayerName = this.getCurrentPlayerName();
-            document.getElementById('currentPlayer').textContent = `Turno di: ${currentPlayerName}`;
-        }
-    }
-
-    updateDiceDisplay(value) {
-        const dice = document.getElementById('dice');
-        if (dice) {
-            dice.textContent = value;
-            
-            // Animazione del dado
-            dice.style.transform = 'rotate(360deg) scale(1.2)';
-            setTimeout(() => {
-                dice.style.transform = 'rotate(0deg) scale(1)';
-            }, 500);
-        }
-    }
-
-    getCurrentPlayerName() {
-        if (!this.gameState) return '';
-        const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentPlayer);
-        return currentPlayer ? currentPlayer.name : '';
-    }
-
-    getPlayerName(playerId) {
-        if (!this.gameState) return '';
-        const player = this.gameState.players.find(p => p.id === playerId);
-        return player ? player.name : '';
     }
 
     getPlayerColor(index) {
@@ -416,11 +322,6 @@ class LudoClient {
         // Mostra menu principale
         document.getElementById('mainMenu').style.display = 'block';
         document.getElementById('gameInfo').classList.remove('show');
-        const gameBoard = document.getElementById('gameBoard');
-        const gameInfo = document.getElementById('gameInfo');
-        
-        if (gameBoard) gameBoard.style.display = 'none';
-        if (gameInfo) gameInfo.style.display = 'none';
         
         // Pulisci input solo se non autenticato
         if (!this.isAuthenticated) {
@@ -447,14 +348,6 @@ class LudoClient {
             }, 5000);
         }
     }
-
-    // Utility per leggere il cookie
-    getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-        return null;
-    }
 }
 
 // Istanza globale del client
@@ -478,10 +371,6 @@ function leaveGame() {
 
 function startGame() {
     ludoClient.startGame();
-}
-
-function rollDice() {
-    ludoClient.rollDice();
 }
 
 // Inizializza il client quando la pagina è caricata

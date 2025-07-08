@@ -1,4 +1,4 @@
-// server-index.js (porta WS 3001)
+// server-index.js (porta WS 3001) - Gestisce solo lobby/matchmaking
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 
 const app = express();
 const PORT = process.env.PORT_WS || 3001;
+const GAMEPLAY_PORT = process.env.PORT_GIOCA || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
@@ -16,9 +17,9 @@ app.use(cookieParser());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
-// Stato partite e mapping socket
-const games = {};
-const playerSockets = {};
+// Stato lobby e mapping socket
+const lobbyGames = {};
+const lobbyPlayerSockets = {};
 
 // Upgrade per WS con verifica cookie JWT
 server.on('upgrade', (req, socket, head) => {
@@ -36,414 +37,292 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', ws => {
-  console.log('Connessione WS:', Boolean(ws.user));
+  console.log('🏠 Connessione lobby WS:', Boolean(ws.user));
+  
   ws.on('message', msgStr => {
     let msg;
-    try { msg = JSON.parse(msgStr); } catch {
+    try { 
+      msg = JSON.parse(msgStr); 
+    } catch {
       return ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
     }
+
+    console.log('📨 Messaggio ricevuto nella lobby:', msg.type);
 
     // Auth via sessionStorage token
     if (msg.type === 'auth' && msg.data?.token) {
       try {
         ws.user = jwt.verify(msg.data.token, JWT_SECRET);
-        ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione WS riuscita' }));
+        console.log('✅ Autenticazione lobby WS riuscita per:', ws.user.userName);
+        ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione lobby riuscita' }));
       } catch {
         return ws.send(JSON.stringify({ type: 'error', message: 'Token non valido' }));
       }
       return;
     }
 
-    // Rejoin dopo redirect
-    if (msg.type === 'rejoin-game') {
-      const { gameId, playerId } = msg.data;
-      const game = games[gameId];
-      if (!game) return ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
-      playerSockets[playerId] = ws;
-      return ws.send(JSON.stringify({ type: 'rejoined', data: { gameState: game } }));
-    }
-
-   // Crea nuova partita
+    // Crea nuova partita
     if (msg.type === 'create-game') {
-        const name = msg.data.playerName;
-        const gameId = Math.random().toString(36).substr(2, 8);
-        const playerId = Math.random().toString(36).substr(2, 9);
+      const name = msg.data.playerName;
+      const gameId = Math.random().toString(36).substr(2, 8);
+      const playerId = Math.random().toString(36).substr(2, 9);
 
-        // Rileva se l'utente è autenticato (sessionStorage o cookie)
-        const isAuth = ws.user && ws.user.userId;
-        const playerEntry = {
-            id: playerId,
-            name: isAuth ? ws.user.userName : name,
-            color: null,
-            pedine: [],
-            isAuthenticated: Boolean(isAuth),
-            userId: isAuth ? ws.user.userId : null,  haPedinaUscitaDallaBase: 0
-        };
+      console.log(`🎲 Creazione partita: ${gameId} per ${name}`);
 
-        const gameState = {
-            players: [playerEntry],
-            host: playerId,
-            gameData: {
-                turnoNumero: 1,
-                dadoTirato: false,
-                ultimoDado: 0
-            },
-            status: 'waiting'
-        };
+      // Rileva se l'utente è autenticato
+      const isAuth = ws.user && ws.user.userId;
+      const playerEntry = {
+        id: playerId,
+        name: isAuth ? ws.user.userName : name,
+        color: null,
+        pedine: [],
+        isAuthenticated: Boolean(isAuth),
+        userId: isAuth ? ws.user.userId : null,
+        haPedinaUscitaDallaBase: 0
+      };
 
-        games[gameId] = gameState;
-        playerSockets[playerId] = ws;
-        ws.send(JSON.stringify({
-            type: 'game-created',
-            data: { gameId, playerId, gameState }
-        }));
-        return;
+      const gameState = {
+        gameId: gameId, // ✅ Aggiungi gameId al gameState
+        players: [playerEntry],
+        host: playerId,
+        gameData: {
+          turnoNumero: 1,
+          dadoTirato: false,
+          ultimoDado: 0
+        },
+        status: 'waiting'
+      };
+
+      lobbyGames[gameId] = gameState;
+      lobbyPlayerSockets[playerId] = ws;
+      
+      ws.send(JSON.stringify({
+        type: 'game-created',
+        data: { gameId, playerId, gameState }
+      }));
+      
+      console.log('✅ Partita creata e aggiunta alla lobby');
+      return;
     }
 
     // Join partita
     if (msg.type === 'join-game') {
-        const { gameId, playerName } = msg.data;
-        const game = games[gameId];
+      const { gameId, playerName } = msg.data;
+      const game = lobbyGames[gameId];
 
-        if (!game || game.players.length >= 4) {
-            return ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Impossibile entrare nella partita'
-            }));
-       }
+      console.log(`👥 Tentativo join: ${playerName} -> ${gameId}`);
 
-       const playerId = Math.random().toString(36).substr(2, 9);
-        // Rileva autenticazione
-        const isAuth = ws.user && ws.user.userId;
-        const playerEntry = {
-            id: playerId,
-            name: isAuth ? ws.user.userName : playerName,
-            color: null,
-            pedine: [],
-            isAuthenticated: Boolean(isAuth),
-            userId: isAuth ? ws.user.userId : null
-        };
-
-        game.players.push(playerEntry);
-       playerSockets[playerId] = ws;
-
-        // Notifica join
-        ws.send(JSON.stringify({
-            type: 'game-joined',
-            data: { gameId, playerId, gameState: game }
+      if (!game || game.players.length >= 4) {
+        console.log('❌ Join fallito: partita non trovata o piena');
+        return ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Impossibile entrare nella partita'
         }));
+      }
 
-        // Broadcast update
-        game.players.forEach(p => {
-            if (playerSockets[p.id]) {
-                playerSockets[p.id].send(JSON.stringify({
-                    type: 'game-updated',
-                    data: { gameState: game }
-                }));
-            }
-        });
+      const playerId = Math.random().toString(36).substr(2, 9);
+      
+      // Rileva autenticazione
+      const isAuth = ws.user && ws.user.userId;
+      const playerEntry = {
+        id: playerId,
+        name: isAuth ? ws.user.userName : playerName,
+        color: null,
+        pedine: [],
+        isAuthenticated: Boolean(isAuth),
+        userId: isAuth ? ws.user.userId : null,
+        haPedinaUscitaDallaBase: 0
+      };
+
+      game.players.push(playerEntry);
+      lobbyPlayerSockets[playerId] = ws;
+
+      console.log(`✅ ${playerName} si è unito. Giocatori: ${game.players.length}/4`);
+
+      // Notifica join
+      ws.send(JSON.stringify({
+        type: 'game-joined',
+        data: { gameId, playerId, gameState: game }
+      }));
+
+      // Broadcast update a tutti i giocatori nella lobby
+      game.players.forEach(p => {
+        if (lobbyPlayerSockets[p.id]) {
+          lobbyPlayerSockets[p.id].send(JSON.stringify({
+            type: 'game-updated',
+            data: { gameState: game }
+          }));
+        }
+      });
+      
+      return;
+    }
+
+    // Leave partita
+    if (msg.type === 'leave-game') {
+      const { gameId, playerId } = msg.data;
+      const game = lobbyGames[gameId];
+      
+      if (!game) return;
+      
+      console.log(`👋 ${playerId} lascia la partita ${gameId}`);
+      
+      // Rimuovi il giocatore
+      game.players = game.players.filter(p => p.id !== playerId);
+      delete lobbyPlayerSockets[playerId];
+      
+      // Se era l'host e ci sono altri giocatori, cambia host
+      if (game.host === playerId && game.players.length > 0) {
+        game.host = game.players[0].id;
+        console.log(`👑 Nuovo host: ${game.players[0].name}`);
+      }
+      
+      // Se non ci sono più giocatori, elimina la partita
+      if (game.players.length === 0) {
+        delete lobbyGames[gameId];
+        console.log(`🗑️ Partita ${gameId} eliminata (vuota)`);
         return;
+      }
+      
+      // Broadcast update ai giocatori rimasti
+      game.players.forEach(p => {
+        if (lobbyPlayerSockets[p.id]) {
+          lobbyPlayerSockets[p.id].send(JSON.stringify({
+            type: 'game-updated',
+            data: { gameState: game, message: `${playerId} ha lasciato la partita` }
+          }));
+        }
+      });
+      
+      return;
     }
 
     // Start partita
     if (msg.type === 'start-game') {
       const { gameId } = msg.data;
-      const game = games[gameId];
-      if (!game || game.players.length !== 4) return ws.send(JSON.stringify({ type: 'error', message: 'Serve 4 giocatori' }));
+      const game = lobbyGames[gameId];
+      
+      if (!game || game.players.length !== 4) {
+        return ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Servono esattamente 4 giocatori per iniziare' 
+        }));
+      }
+      
+      console.log(`🚀 Avvio partita: ${gameId}`);
       
       // Assegna colori e pedine
-      const colors = ['blu','rosso','verde','giallo'];
-      game.players.forEach((p,i) => {
+      const colors = ['blu', 'rosso', 'verde', 'giallo'];
+      game.players.forEach((p, i) => {
         p.color = colors[i];
-        p.pedine = Array(4).fill(0).map(() => ({ posizione:'base', casella:null }));
+        p.pedine = Array(4).fill(0).map(() => ({ posizione: 'base', casella: null }));
       });
       
       game.turnoCorrente = colors[0];
       game.status = 'playing';
       game.gameData.turnoNumero = 1;
       
-      // Broadcast start
-      game.players.forEach(p => {
-        playerSockets[p.id]?.send(JSON.stringify({ type: 'game-started', data: { gameState: game, color: p.color } }));
-      });
-      return;
-    }
-
-    // Tira dado
-    if (msg.type === 'throw-dice') {
-      const { gameId, playerId } = msg.data;
-      const game = games[gameId];
-      if (!game) return;
+      // ✅ TRASFERIMENTO AL SERVER GAMEPLAY
+      console.log(`📤 Trasferimento partita ${gameId} al server gameplay`);
       
-      const player = game.players.find(p=>p.id===playerId);
-      if (game.turnoCorrente !== player.color) return ws.send(JSON.stringify({ type: 'error', message: 'Non è il tuo turno' }));
+      // Crea connessione al server gameplay per trasferire la partita
+      const gameplayWs = new WebSocket(`ws://localhost:${GAMEPLAY_PORT}`);
       
-      
-      if (player.haPedinaUscitaDallaBase)
-      {
-        roll = Math.floor(Math.random()*4) + 3; 
-        player.haPedinaUscitaDallaBase = 0; // Reset dopo il primo lancio
-      } else roll = Math.floor(Math.random()*6) + 1;
-
-      game.gameData.ultimoDado = roll;
-      game.gameData.dadoTirato = true;
-      
-      // Broadcast dice result
-      game.players.forEach(p => {
-        playerSockets[p.id]?.send(JSON.stringify({ 
-          type:'dice-thrown', 
-          data:{ 
-            gameState:game, 
-            diceResult:roll, 
-            playerColor:p.color 
-          } 
+      gameplayWs.on('open', () => {
+        // Invia la partita al server gameplay
+        gameplayWs.send(JSON.stringify({
+          type: 'transfer-game',
+          data: { gameState: game }
         }));
-      });
-      
-      return;
-    }
-
-    // Skip turn (quando non ci sono mosse possibili)
-    if (msg.type === 'skip-turn') {
-      const { gameId, playerId } = msg.data;
-      const game = games[gameId];
-      if (!game) return;
-      
-      const player = game.players.find(p=>p.id===playerId);
-      if (game.turnoCorrente !== player.color) return;
-      
-      // Passa al prossimo turno
-      advanceTurn(game);
-      
-      // Broadcast update
-      game.players.forEach(p => {
-        playerSockets[p.id]?.send(JSON.stringify({ 
-          type:'piece-moved', 
-          data:{ gameState:game } 
-        }));
-      });
-      
-      return;
-    }
-
-    // Muovi pedina
-    if (msg.type === 'move-piece') {
-      const { gameId, playerId, pieceId, currentPosition } = msg.data;
-      const game = games[gameId];
-      if (!game) return;
-      
-      const player = game.players.find(p=>p.id===playerId);
-      if (game.turnoCorrente!==player.color || !game.gameData.dadoTirato) {
-        return ws.send(JSON.stringify({ type:'error', message:'Azione non valida' }));
-      }
-      
-      const piece = player.pedine[pieceId];
-      const diceValue = game.gameData.ultimoDado;
-      
-      // Verifica se la mossa è valida
-      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero, player.color)) {
-        return ws.send(JSON.stringify({ type:'error', message:'Mossa non valida' }));
-      }
-      
-      // Calcola nuova posizione
-      const newPosition = calculateNewPosition(piece, diceValue, player.color);
-      if (piece.posizione === 'base')
-        player.haPedinaUscitaDallaBase = 1;
-      
-      // Controlla se c'è una pedina da mangiare (solo se rimane nel percorso)
-      let eatenPiece = null;
-      if (newPosition.posizione === 'percorso') {
-        eatenPiece = checkForEating(game, newPosition, player.color);
-      }
-      
-      // Muovi la pedina
-      player.pedine[pieceId] = newPosition;
-      
-      // Se ha mangiato una pedina
-      if (eatenPiece) {
-        // Rimanda la pedina mangiata alla base
-        eatenPiece.player.pedine[eatenPiece.pieceIndex] = { posizione: 'base', casella: null };
         
-        // Notifica che una pedina è stata mangiata
+        console.log('✅ Partita trasferita al server gameplay');
+        
+        // Chiudi la connessione di trasferimento
+        gameplayWs.close();
+        
+        // Notifica ai client di fare redirect
         game.players.forEach(p => {
-          playerSockets[p.id]?.send(JSON.stringify({ 
-            type:'piece-eaten', 
-            data:{ 
-              gameState: game,
-              eaterPlayerId: playerId,
-              eatenPlayerId: eatenPiece.player.id,
-              eatenColor: eatenPiece.player.color,
-              position: newPosition.casella
-            } 
-          }));
+          if (lobbyPlayerSockets[p.id]) {
+            lobbyPlayerSockets[p.id].send(JSON.stringify({ 
+              type: 'game-started', 
+              data: { 
+                gameState: game, 
+                color: p.color,
+                redirectUrl: `gioca.html?gameId=${gameId}&playerId=${p.id}`
+              } 
+            }));
+          }
         });
-      }
-      
-      game.gameData.dadoTirato = false;
-      
-      // Se ha fatto 6, può tirare di nuovo, altrimenti avanza turno
-      if (diceValue !== 6) {
-        advanceTurn(game);
-      }
-      
-      // Broadcast move
-      game.players.forEach(p => {
-        playerSockets[p.id]?.send(JSON.stringify({ 
-          type:'piece-moved', 
-          data:{ gameState:game } 
-        }));
+        
+        // Rimuovi la partita dalla lobby (ora è gestita dal server gameplay)
+        delete lobbyGames[gameId];
+        
+        // Pulisci i socket dei giocatori dalla lobby
+        game.players.forEach(p => {
+          delete lobbyPlayerSockets[p.id];
+        });
+        
+        console.log(`🧹 Partita ${gameId} rimossa dalla lobby`);
       });
       
-      // Verifica vittoria
-      if (player.pedine.every(pd => pd.posizione === 'destinazione')) {
-        game.status = 'finished';
-        game.players.forEach(p => {
-          playerSockets[p.id]?.send(JSON.stringify({ 
-            type:'game-finished', 
-            data:{ gameState:game, winner:player } 
-          }));
-        });
-        delete games[gameId];
-      }
+      gameplayWs.on('error', (error) => {
+        console.error('❌ Errore connessione al server gameplay:', error);
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Impossibile avviare la partita. Server gameplay non disponibile.' 
+        }));
+      });
       
       return;
     }
   });
+
+  // Gestione disconnessione
+  ws.on('close', () => {
+    console.log('❌ Connessione lobby chiusa');
+    
+    // Trova e rimuovi il giocatore dai socket
+    for (const [playerId, socket] of Object.entries(lobbyPlayerSockets)) {
+      if (socket === ws) {
+        console.log(`👋 Player ${playerId} disconnesso dalla lobby`);
+        
+        // Trova la partita del giocatore e gestisci la disconnessione
+        for (const [gameId, game] of Object.entries(lobbyGames)) {
+          const playerIndex = game.players.findIndex(p => p.id === playerId);
+          if (playerIndex !== -1) {
+            // Rimuovi il giocatore
+            game.players.splice(playerIndex, 1);
+            
+            // Se era l'host e ci sono altri giocatori, cambia host
+            if (game.host === playerId && game.players.length > 0) {
+              game.host = game.players[0].id;
+            }
+            
+            // Se non ci sono più giocatori, elimina la partita
+            if (game.players.length === 0) {
+              delete lobbyGames[gameId];
+            } else {
+              // Notifica gli altri giocatori
+              game.players.forEach(p => {
+                if (lobbyPlayerSockets[p.id]) {
+                  lobbyPlayerSockets[p.id].send(JSON.stringify({
+                    type: 'game-updated',
+                    data: { gameState: game, message: `Un giocatore si è disconnesso` }
+                  }));
+                }
+              });
+            }
+            break;
+          }
+        }
+        
+        delete lobbyPlayerSockets[playerId];
+        break;
+      }
+    }
+  });
 });
 
-// Funzioni helper
-
-function canMovePiece(piece, diceValue, turnNumber, playerColor) {
-  // Se è in base, può uscire solo con 6 o al primo turno
-  if (piece.posizione === 'base') {
-    return diceValue === 6 || turnNumber === 1;
-  }
-  
-  // Se è nel percorso, controlla se può muoversi
-  if (piece.posizione === 'percorso') {
-    const newPosition = calculateNewPosition(piece, diceValue, playerColor);
-    // Se va in destinazione, controlla che non superi le 4 caselle
-    if (newPosition.posizione === 'destinazione') {
-      return newPosition.casella <= 4;
-    }
-    return true;
-  }
-  
-  // Se è già in destinazione, può muoversi solo se non supera la casella 4
-  if (piece.posizione === 'destinazione') {
-    return piece.casella + diceValue <= 4;
-  }
-  
-  return true;
-}
-
-function calculateNewPosition(piece, diceValue, playerColor) {
-  if (piece.posizione === 'base') {
-    // Esce dalla base e va alla casella di partenza del suo colore
-    const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
-    return { posizione: 'percorso', casella: startPositions[playerColor] };
-  }
-  
-  if (piece.posizione === 'percorso') {
-    let newCasella = piece.casella + diceValue;
-    
-    // Definisci le caselle di ingresso alla zona destinazione per ogni colore
-    const homeEntrances = { 
-      blu: 40,    // Il blu entra in destinazione dalla casella 40
-      rosso: 10,  // Il rosso entra in destinazione dalla casella 10
-      verde: 20,  // Il verde entra in destinazione dalla casella 20
-      giallo: 30  // Il giallo entra in destinazione dalla casella 30
-    };
-    
-    const homeEntrance = homeEntrances[playerColor];
-    
-    // Gestione del percorso circolare (40 caselle)
-    if (newCasella > 40) {
-      newCasella = newCasella - 40;
-    }
-    
-    // Controlla se la pedina dovrebbe entrare nella zona di destinazione
-    // Questo accade quando la pedina passa attraverso o si ferma sulla casella di ingresso
-    const originalCasella = piece.casella;
-    
-    // Calcola se nel movimento attraversa la casella di ingresso
-    let crossesHome = false;
-    if (originalCasella <= homeEntrance && newCasella >= homeEntrance) {
-      crossesHome = true;
-    } else if (originalCasella > homeEntrance && (newCasella + 40) >= (homeEntrance + 40)) {
-      // Caso in cui attraversa lo 0 (da 39 a 1, per esempio)
-      crossesHome = true;
-    }
-    
-    if (crossesHome) {
-      // Calcola quanto oltrepassa la casella di ingresso
-      let stepsIntoHome;
-      if (originalCasella <= homeEntrance) {
-        stepsIntoHome = newCasella - homeEntrance;
-      } else {
-        // Caso attraversamento dello 0
-        stepsIntoHome = (newCasella + 40) - (homeEntrance + 40);
-      }
-      
-      // Se i passi sono 0 o positivi, entra nella destinazione
-      if (stepsIntoHome >= 0) {
-        const destinationSlot = stepsIntoHome + 1; // Le caselle destinazione vanno da 1 a 4
-        if (destinationSlot <= 4) {
-          return { posizione: 'destinazione', casella: destinationSlot };
-        } else {
-          // Se supererebbe la destinazione, rimane nel percorso
-          return { posizione: 'percorso', casella: newCasella };
-        }
-      }
-    }
-    
-    return { posizione: 'percorso', casella: newCasella };
-  }
-  
-  if (piece.posizione === 'destinazione') {
-    const newDestinationSlot = piece.casella + diceValue;
-    if (newDestinationSlot <= 4) {
-      return { posizione: 'destinazione', casella: newDestinationSlot };
-    } else {
-      // Non può muoversi se supererebbe la casella 4
-      return piece;
-    }
-  }
-  
-  return piece;
-}
-
-function checkForEating(game, newPosition, currentPlayerColor) {
-  if (newPosition.posizione !== 'percorso') return null;
-  
-  // Cerca se c'è una pedina di un altro giocatore nella nuova posizione
-  for (let player of game.players) {
-    if (player.color === currentPlayerColor) continue;
-    
-    for (let i = 0; i < player.pedine.length; i++) {
-      const piece = player.pedine[i];
-      if (piece.posizione === 'percorso' && piece.casella === newPosition.casella) {
-        return {
-          player: player,
-          pieceIndex: i,
-          piece: piece
-        };
-      }
-    }
-  }
-  
-  return null;
-}
-
-function advanceTurn(game) {
-  const currentIndex = game.players.findIndex(p => p.color === game.turnoCorrente);
-  const nextIndex = (currentIndex + 1) % game.players.length;
-  game.turnoCorrente = game.players[nextIndex].color;
-  
-  // Se è tornato al primo giocatore, incrementa il numero del turno
-  if (nextIndex === 0) {
-    game.gameData.turnoNumero = (game.gameData.turnoNumero || 1) + 1;
-  }
-}
-
-server.listen(PORT, () => console.log(`WS server listening on ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🏠 Server lobby in ascolto su porta ${PORT}`);
+});
