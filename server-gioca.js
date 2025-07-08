@@ -113,6 +113,30 @@ wss.on('connection', ws => {
 
       game.gameData.ultimoDado = roll;
       game.gameData.dadoTirato = true;
+
+      // Controlla se il giocatore può effettivamente muoversi
+const canMove = canPlayerMove(player, roll, game.gameData.turnoNumero);
+if (!canMove) {
+  console.log(`⏭️ ${player.color} non può muoversi con dado ${roll}, turno automaticamente passato`);
+  
+  setTimeout(() => {
+    game.gameData.dadoTirato = false;
+    advanceTurn(game);
+    
+    game.players.forEach(p => {
+      if (playerSockets[p.id]) {
+        playerSockets[p.id].send(JSON.stringify({ 
+          type: 'piece-moved', 
+          data: { 
+            gameState: game,
+            autoSkipped: true,
+            message: `${player.color} non può muoversi e passa automaticamente il turno`
+          } 
+        }));
+      }
+    });
+  }, 2000);
+}
       
       console.log(`🎲 ${player.color} ha tirato: ${roll}`);
       
@@ -175,7 +199,7 @@ wss.on('connection', ws => {
       const diceValue = game.gameData.ultimoDado;
       
       // Verifica se la mossa è valida
-      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero, player.color)) {
+      if (!canMovePiece(piece, diceValue, game.gameData.turnoNumero, player.color, player.pedine)) {
         return ws.send(JSON.stringify({ type: 'error', message: 'Mossa non valida' }));
       }
       
@@ -273,81 +297,159 @@ wss.on('connection', ws => {
 
 // Funzioni helper per la logica di gioco (spostate dal server-index originale)
 
-function canMovePiece(piece, diceValue, turnNumber, playerColor) {
+// ✅ SOSTITUISCI anche questa funzione nel server-gioca.js (circa linea 190)
+// ✅ SOSTITUISCI nel server-gioca.js - Aggiorna la funzione canMovePiece
+
+function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces) {
+  console.log(`🔍 Validazione mossa: ${playerColor}, posizione: ${piece.posizione}, dado: ${diceValue}`);
+  
+  // CASO 1: Pedina in base
   if (piece.posizione === 'base') {
-    return diceValue === 6 || turnNumber === 1;
+    // Regola standard: può uscire con 6
+    if (diceValue === 6) {
+      console.log(`🏠 Pedina in base: PUÒ uscire con 6`);
+      return true;
+    }
+    
+    // Regola primo turno: può uscire con qualsiasi numero
+    if (turnNumber === 1) {
+      console.log(`🏠 Pedina in base: PUÒ uscire (primo turno)`);
+      return true;
+    }
+    
+    // ✅ NUOVA REGOLA: Se tutte le pedine sono in base, può uscire con qualsiasi numero
+    const allPiecesInBase = allPlayerPieces.every(p => p.posizione === 'base');
+    if (allPiecesInBase) {
+      console.log(`🏠 Pedina in base: PUÒ uscire (tutte le pedine in base)`);
+      return true;
+    }
+    
+    console.log(`🏠 Pedina in base: NON PUÒ uscire (serve 6)`);
+    return false;
   }
   
+  // CASO 2: Pedina nel percorso
   if (piece.posizione === 'percorso') {
     const newPosition = calculateNewPosition(piece, diceValue, playerColor);
     if (newPosition.posizione === 'destinazione') {
-      return newPosition.casella <= 4;
+      const isValid = newPosition.casella <= 4;
+      console.log(`🎯 Destinazione: casella ${newPosition.casella} - ${isValid ? 'VALIDA' : 'NON VALIDA'}`);
+      return isValid;
     }
+    console.log(`🔄 Percorso: movimento valido`);
     return true;
   }
   
+  // CASO 3: Pedina nella destinazione
   if (piece.posizione === 'destinazione') {
-    return piece.casella + diceValue <= 4;
+    const newSlot = piece.casella + diceValue;
+    const isValid = newSlot <= 4;
+    console.log(`🏁 Destinazione: ${piece.casella} + ${diceValue} = ${newSlot} - ${isValid ? 'VALIDA' : 'NON VALIDA'}`);
+    return isValid;
   }
   
-  return true;
+  return false;
 }
 
+function canPlayerMove(player, diceValue, turnNumber) {
+  return player.pedine.some(piece => 
+    canMovePiece(piece, diceValue, turnNumber, player.color, player.pedine)
+  );
+}
+
+// ✅ SOSTITUISCI questa funzione nel server-gioca.js (circa linea 220)
+
 function calculateNewPosition(piece, diceValue, playerColor) {
+  console.log(`🎯 Calcolo mossa: ${playerColor}, posizione: ${piece.posizione}, casella: ${piece.casella}, dado: ${diceValue}`);
+  
+  // CASO 1: Pedina esce dalla base
   if (piece.posizione === 'base') {
     const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
-    return { posizione: 'percorso', casella: startPositions[playerColor] };
+    const newPosition = { posizione: 'percorso', casella: startPositions[playerColor] };
+    console.log(`🚀 Pedina ${playerColor} esce dalla base → casella ${newPosition.casella}`);
+    return newPosition;
   }
   
+  // CASO 2: Pedina nel percorso principale
   if (piece.posizione === 'percorso') {
-    let newCasella = piece.casella + diceValue;
+    const currentCasella = piece.casella;
+    let newCasella = currentCasella + diceValue;
     
-    const homeEntrances = { 
-      blu: 40, rosso: 10, verde: 20, giallo: 30
-    };
-    
-    const homeEntrance = homeEntrances[playerColor];
-    
+    // Gestione percorso circolare (1-40)
     if (newCasella > 40) {
       newCasella = newCasella - 40;
     }
     
-    const originalCasella = piece.casella;
+    console.log(`📍 ${playerColor}: ${currentCasella} + ${diceValue} = ${newCasella} (prima del controllo destinazione)`);
     
-    let crossesHome = false;
-    if (originalCasella <= homeEntrance && newCasella >= homeEntrance) {
-      crossesHome = true;
-    } else if (originalCasella > homeEntrance && (newCasella + 40) >= (homeEntrance + 40)) {
-      crossesHome = true;
-    }
+    // Caselle di ingresso destinazione per ogni colore
+    const destinationEntries = { blu: 40, rosso: 10, verde: 20, giallo: 30 };
+    const entryPoint = destinationEntries[playerColor];
     
-    if (crossesHome) {
-      let stepsIntoHome;
-      if (originalCasella <= homeEntrance) {
-        stepsIntoHome = newCasella - homeEntrance;
-      } else {
-        stepsIntoHome = (newCasella + 40) - (homeEntrance + 40);
+    // ✅ LOGICA CORRETTA: Verifica se deve entrare in destinazione
+    let shouldEnter = false;
+    let stepsToEntry = 0;
+    
+    // CASO A: Movimento normale (senza attraversare 40→1)
+    if (currentCasella <= newCasella) {
+      if (currentCasella < entryPoint && newCasella >= entryPoint) {
+        shouldEnter = true;
+        stepsToEntry = entryPoint - currentCasella;
+        console.log(`✅ Movimento normale: attraversa casella ${entryPoint}, passi per arrivarci: ${stepsToEntry}`);
       }
+    }
+    // CASO B: Movimento con wrap-around (attraversa 40→1)
+    else {
+      // La pedina ha attraversato il punto 40→1
+      // Esempio: da 38 con dado 5 → 38,39,40,1,2,3
       
-      if (stepsIntoHome >= 0) {
-        const destinationSlot = stepsIntoHome + 1;
-        if (destinationSlot <= 4) {
-          return { posizione: 'destinazione', casella: destinationSlot };
-        } else {
-          return { posizione: 'percorso', casella: newCasella };
-        }
+      if (currentCasella < entryPoint) {
+        // Caso: pedina prima del punto di ingresso, attraversa durante il wrap
+        shouldEnter = true;
+        stepsToEntry = entryPoint - currentCasella;
+        console.log(`✅ Wrap-around caso A: attraversa casella ${entryPoint}, passi: ${stepsToEntry}`);
+      } else if (newCasella >= entryPoint) {
+        // Caso: pedina dopo il wrap raggiunge il punto di ingresso
+        shouldEnter = true;
+        stepsToEntry = (40 - currentCasella) + entryPoint;
+        console.log(`✅ Wrap-around caso B: raggiunge casella ${entryPoint} dopo wrap, passi: ${stepsToEntry}`);
       }
     }
     
+    if (shouldEnter) {
+      const stepsInDestination = diceValue - stepsToEntry;
+      console.log(`🏠 ${playerColor}: entra in destinazione, passi dentro: ${stepsInDestination}`);
+      
+      if (stepsInDestination <= 0) {
+        // Arriva esattamente al punto di ingresso
+        console.log(`🎯 ${playerColor}: entra in destinazione casella 1`);
+        return { posizione: 'destinazione', casella: 1 };
+      } else if (stepsInDestination <= 4) {
+        // Entra e avanza nella destinazione
+        const finalSlot = stepsInDestination + 1;
+        console.log(`🎯 ${playerColor}: entra in destinazione casella ${finalSlot}`);
+        return { posizione: 'destinazione', casella: finalSlot };
+      } else {
+        // Supererebbe la destinazione (più di 4 caselle), rimane nel percorso
+        console.log(`❌ ${playerColor}: supererebbe la destinazione, rimane nel percorso casella ${newCasella}`);
+        return { posizione: 'percorso', casella: newCasella };
+      }
+    }
+    
+    // Non entra in destinazione, rimane nel percorso
+    console.log(`🔄 ${playerColor}: rimane nel percorso → casella ${newCasella}`);
     return { posizione: 'percorso', casella: newCasella };
   }
   
+  // CASO 3: Pedina già nella zona destinazione
   if (piece.posizione === 'destinazione') {
-    const newDestinationSlot = piece.casella + diceValue;
-    if (newDestinationSlot <= 4) {
-      return { posizione: 'destinazione', casella: newDestinationSlot };
+    const newSlot = piece.casella + diceValue;
+    if (newSlot <= 4) {
+      console.log(`🏁 ${playerColor}: destinazione ${piece.casella} → ${newSlot}`);
+      return { posizione: 'destinazione', casella: newSlot };
     } else {
-      return piece;
+      console.log(`❌ ${playerColor}: non può muoversi, supererebbe casella 4`);
+      return piece; // Non può muoversi
     }
   }
   
