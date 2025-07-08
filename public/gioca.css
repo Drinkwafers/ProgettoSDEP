@@ -219,3 +219,91 @@ img:hover {
 #game-info br {
     margin: 5px 0;
 }
+/* Pedina che può muoversi */
+.can-move {
+    box-shadow: 0 0 15px 3px #00ff00 !important;
+    animation: pulse-green 2s infinite;
+    z-index: 10;
+}
+
+/* Pedina bloccata */
+.blocked {
+    box-shadow: 0 0 15px 3px #ff6666 !important;
+    opacity: 0.7;
+    animation: none;
+    z-index: 5;
+}
+
+/* Animazione per pedine che possono muoversi */
+@keyframes pulse-green {
+    0% { 
+        box-shadow: 0 0 15px 3px #00ff00;
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 25px 5px #00ff00;
+        transform: scale(1.05);
+    }
+    100% { 
+        box-shadow: 0 0 15px 3px #00ff00;
+        transform: scale(1);
+    }
+}
+
+/* Hover effects per pedine */
+img.can-move:hover {
+    transform: scale(1.2) !important;
+    box-shadow: 0 0 20px 5px #00ff00 !important;
+    cursor: pointer;
+}
+
+img.blocked:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 0 20px 5px #ff6666 !important;
+    cursor: not-allowed;
+}
+
+/* Messaggio di stato per collisioni */
+.collision-warning {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    font-weight: bold;
+    z-index: 1000;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
+/* Evidenziazione caselle occupate (per debug) */
+.occupied-highlight {
+    background-color: rgba(255, 255, 0, 0.3) !important;
+    border: 2px solid #ffcc00 !important;
+}
+
+/* Tooltip per informazioni pedine */
+img[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1001;
+    pointer-events: none;
+    margin-top: -30px;
+    margin-left: 10px;
+}
