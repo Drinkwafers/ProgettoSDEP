@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT_GIOCA || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
-app.use(cors({ origin: 'http://10.109.3.17:3000', credentials: true }));
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(cookieParser());
 
 const server = http.createServer(app);

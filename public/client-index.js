@@ -61,7 +61,7 @@ class LudoClient {
 
     initializeConnection() {
         try {
-            this.socket = new WebSocket('ws:///10.109.3.17:3001');
+            this.socket = new WebSocket('ws:///localhost:3001');
 
             this.socket.onopen = () => {
                 console.log('Connessione WebSocket lobby aperta');

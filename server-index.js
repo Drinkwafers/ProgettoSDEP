@@ -11,7 +11,7 @@ const PORT = process.env.PORT_WS || 3001;
 const GAMEPLAY_PORT = process.env.PORT_GIOCA || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
-app.use(cors({ origin: 'http://10.109.3.17:3000', credentials: true }));
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(cookieParser());
 
 const server = http.createServer(app);
@@ -226,7 +226,7 @@ wss.on('connection', ws => {
       console.log(`Trasferimento partita ${gameId} al server gameplay`);
       
       // Crea connessione al server gameplay per trasferire la partita
-      const gameplayWs = new WebSocket(`ws://10.109.3.17:${GAMEPLAY_PORT}`);
+      const gameplayWs = new WebSocket(`ws://localhost:${GAMEPLAY_PORT}`);
       
       gameplayWs.on('open', () => {
         // Invia la partita al server gameplay

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log(` Inizializzazione gameplay - Game: ${gameId}, Player: ${playerId}`);
 
   // Connessione al server gameplay (porta 3002)
-  ws = new WebSocket('ws:///10.109.3.17:3002');
+  ws = new WebSocket('ws:///localhost:3002');
 
   ws.onopen = () => {
     console.log(' Connesso al server gameplay');

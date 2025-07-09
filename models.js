@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 
 // 1) Configurazione connessione MySQL
 const sequelize = new Sequelize('sdep_db', 'admin', '#C4labriaM!a', {
-  host: '10.109.3.17',
+  host: 'localhost',
   dialect: 'mysql',
   pool: {
     max: 10,
