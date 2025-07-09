@@ -14,7 +14,7 @@ app.use(express.static("public"));
 const JWT_SECRET = "mia_chiave_super_segreta";
 
 const pool = mysql.createPool({
-    host: "localhost",
+    host: "10.109.3.17",
     user: "admin",
     password: "#C4labriaM!a",
     database: "sdep_db",
@@ -365,7 +365,12 @@ app.post("/api/update-game-stats", authenticateTokenFromHeader, async (req, res)
         });
     }
 });
-
+/*
 app.listen(PORT, () => {
-    console.log("Server in ascolto su http://localhost:" + PORT);
+    console.log("Server in ascolto su http://10.109.3.17:" + PORT);
+});
+*/
+
+app.listen(PORT, '10.109.3.17',  () => {
+    console.log("Server in ascolto su http://10.109.3.17:" + PORT);
 });

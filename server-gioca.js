@@ -1,4 +1,4 @@
-// server-gioca.js (porta WS 3002) - Gestisce solo il gameplay
+// server-gioca.js (porta WS 3002) - Gestisce solo il gioca
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT_GIOCA || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: 'http://10.109.3.17:3000', credentials: true }));
 app.use(cookieParser());
 
 const server = http.createServer(app);
@@ -36,7 +36,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', ws => {
-  console.log('🎮 Connessione gameplay WS:', Boolean(ws.user));
+  console.log(' Connessione gioca WS:', Boolean(ws.user));
   
   ws.on('message', msgStr => {
     let msg;
@@ -46,14 +46,14 @@ wss.on('connection', ws => {
       return ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
     }
 
-    console.log('📨 Messaggio ricevuto nel server gioca:', msg.type);
+    console.log(' Messaggio ricevuto nel server gioca:', msg.type);
 
     // Auth via sessionStorage token
     if (msg.type === 'auth' && msg.data?.token) {
       try {
         ws.user = jwt.verify(msg.data.token, JWT_SECRET);
-        console.log('✅ Autenticazione gameplay WS riuscita per:', ws.user.userName);
-        ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione gameplay riuscita' }));
+        console.log(' Autenticazione gioca WS riuscita per:', ws.user.userName);
+        ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione gioca riuscita' }));
       } catch {
         return ws.send(JSON.stringify({ type: 'error', message: 'Token non valido' }));
       }
@@ -63,25 +63,25 @@ wss.on('connection', ws => {
     // Rejoin dopo redirect da lobby
     if (msg.type === 'rejoin-game') {
       const { gameId, playerId } = msg.data;
-      console.log(`🔄 Rejoin game: ${gameId}, player: ${playerId}`);
+      console.log(` Rejoin game: ${gameId}, player: ${playerId}`);
       
       const game = activeGames[gameId];
       if (!game) {
-        console.log('❌ Partita non trovata:', gameId);
+        console.log(' Partita non trovata:', gameId);
         return ws.send(JSON.stringify({ type: 'error', message: 'Partita non trovata' }));
       }
       
       playerSockets[playerId] = ws;
-      console.log('✅ Player reconnesso al gameplay');
+      console.log(' Player reconnesso al gioca');
       return ws.send(JSON.stringify({ type: 'rejoined', data: { gameState: game } }));
     }
 
     // Ricevi partita dalla lobby
     if (msg.type === 'transfer-game') {
       const { gameState } = msg.data;
-      console.log('📤 Ricevuta partita dalla lobby:', gameState.gameId);
+      console.log('Ricevuta partita dalla lobby:', gameState.gameId);
       
-      // Memorizza la partita nel server gameplay
+      // Memorizza la partita nel server gioca
       activeGames[gameState.gameId] = gameState;
       
       // Non mandare risposta, la lobby gestirà il redirect
@@ -117,7 +117,7 @@ wss.on('connection', ws => {
       // Controlla se il giocatore può effettivamente muoversi
 const canMove = canPlayerMove(player, roll, game.gameData.turnoNumero);
 if (!canMove) {
-  console.log(`⏭️ ${player.color} non può muoversi con dado ${roll}, turno automaticamente passato`);
+  console.log(`${player.color} non può muoversi con dado ${roll}, turno automaticamente passato`);
   
   setTimeout(() => {
     game.gameData.dadoTirato = false;
@@ -138,7 +138,7 @@ if (!canMove) {
   }, 2000);
 }
       
-      console.log(`🎲 ${player.color} ha tirato: ${roll}`);
+      console.log(`${player.color} ha tirato: ${roll}`);
       
       // Broadcast dice result
       game.players.forEach(p => {
@@ -166,7 +166,7 @@ if (!canMove) {
       const player = game.players.find(p => p.id === playerId);
       if (game.turnoCorrente !== player.color) return;
       
-      console.log(`⏭️ ${player.color} salta il turno`);
+      console.log(`${player.color} salta il turno`);
       
       // Passa al prossimo turno
       advanceTurn(game);
@@ -203,7 +203,7 @@ if (!canMove) {
         return ws.send(JSON.stringify({ type: 'error', message: 'Mossa non valida - pedina bloccata o casella occupata' }));
     }
       
-      console.log(`🚶 ${player.color} muove pedina ${pieceId}`);
+      console.log(`${player.color} muove pedina ${pieceId}`);
       
       // Calcola nuova posizione
       const newPosition = calculateNewPosition(piece, diceValue, player.color);
@@ -224,7 +224,7 @@ if (!canMove) {
       if (eatenPiece) {
         eatenPiece.player.pedine[eatenPiece.pieceIndex] = { posizione: 'base', casella: null };
         
-        console.log(`😋 ${player.color} ha mangiato ${eatenPiece.player.color}`);
+        console.log(`${player.color} ha mangiato ${eatenPiece.player.color}`);
         
         // Notifica che una pedina è stata mangiata
         game.players.forEach(p => {
@@ -263,7 +263,7 @@ if (!canMove) {
       // Verifica vittoria
       if (player.pedine.every(pd => pd.posizione === 'destinazione')) {
         game.status = 'finished';
-        console.log(`🏆 ${player.color} ha vinto!`);
+        console.log(`${player.color} ha vinto!`);
         
         game.players.forEach(p => {
           if (playerSockets[p.id]) {
@@ -283,7 +283,7 @@ if (!canMove) {
 
     // Disconnessione
     ws.on('close', () => {
-      console.log('❌ Connessione gameplay chiusa');
+      console.log(' Connessione gioca chiusa');
       // Rimuovi il socket dai mapping
       for (const [playerId, socket] of Object.entries(playerSockets)) {
         if (socket === ws) {
@@ -297,26 +297,23 @@ if (!canMove) {
 
 // Funzioni helper per la logica di gioco (spostate dal server-index originale)
 
-// ✅ SOSTITUISCI anche questa funzione nel server-gioca.js (circa linea 190)
-// ✅ SOSTITUISCI nel server-gioca.js - Aggiorna la funzione canMovePiece
-
 function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces, pieceId = -1) {
-  console.log(`🔍 Validazione mossa: ${playerColor}, posizione: ${piece.posizione}, dado: ${diceValue}, pieceId: ${pieceId}`);
+  console.log(`Validazione mossa: ${playerColor}, posizione: ${piece.posizione}, dado: ${diceValue}, pieceId: ${pieceId}`);
   
   // CASO 1: Pedina in base
   if (piece.posizione === 'base') {
     // Regola standard: può uscire con 6
     if (diceValue === 6) {
-      // ✅ CONTROLLO COLLISIONE: Verifica se la casella di partenza è libera
+      //  CONTROLLO COLLISIONE: Verifica se la casella di partenza è libera
       const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
       const startPosition = { posizione: 'percorso', casella: startPositions[playerColor] };
       
       if (isPositionOccupiedBySameColor(startPosition, playerColor, allPlayerPieces, pieceId)) {
-        console.log(`🏠 Pedina in base: NON PUÒ uscire con 6 (casella di partenza occupata)`);
+        console.log(` Pedina in base: NON PUÒ uscire con 6 (casella di partenza occupata)`);
         return false;
       }
       
-      console.log(`🏠 Pedina in base: PUÒ uscire con 6`);
+      console.log(` Pedina in base: PUÒ uscire con 6`);
       return true;
     }
     
@@ -326,11 +323,11 @@ function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces
       const startPosition = { posizione: 'percorso', casella: startPositions[playerColor] };
       
       if (isPositionOccupiedBySameColor(startPosition, playerColor, allPlayerPieces, pieceId)) {
-        console.log(`🏠 Pedina in base: NON PUÒ uscire (primo turno, casella occupata)`);
+        console.log(` Pedina in base: NON PUÒ uscire (primo turno, casella occupata)`);
         return false;
       }
       
-      console.log(`🏠 Pedina in base: PUÒ uscire (primo turno)`);
+      console.log(` Pedina in base: PUÒ uscire (primo turno)`);
       return true;
     }
     
@@ -341,15 +338,15 @@ function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces
       const startPosition = { posizione: 'percorso', casella: startPositions[playerColor] };
       
       if (isPositionOccupiedBySameColor(startPosition, playerColor, allPlayerPieces, pieceId)) {
-        console.log(`🏠 Pedina in base: NON PUÒ uscire (tutte in base, casella occupata)`);
+        console.log(` Pedina in base: NON PUÒ uscire (tutte in base, casella occupata)`);
         return false;
       }
       
-      console.log(`🏠 Pedina in base: PUÒ uscire (tutte le pedine in base)`);
+      console.log(` Pedina in base: PUÒ uscire (tutte le pedine in base)`);
       return true;
     }
     
-    console.log(`🏠 Pedina in base: NON PUÒ uscire (serve 6)`);
+    console.log(` Pedina in base: NON PUÒ uscire (serve 6)`);
     return false;
   }
   
@@ -360,28 +357,28 @@ function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces
     // Se va in destinazione, controlla che non superi la casella 4
     if (newPosition.posizione === 'destinazione') {
       if (newPosition.casella > 4) {
-        console.log(`🎯 Destinazione: casella ${newPosition.casella} - NON VALIDA (supera 4)`);
+        console.log(` Destinazione: casella ${newPosition.casella} - NON VALIDA (supera 4)`);
         return false;
       }
       
-      // ✅ CONTROLLO COLLISIONE per destinazione
+      //  CONTROLLO COLLISIONE per destinazione
       if (isPositionOccupiedBySameColor(newPosition, playerColor, allPlayerPieces, pieceId)) {
-        console.log(`🎯 Destinazione: casella ${newPosition.casella} - NON VALIDA (occupata)`);
+        console.log(` Destinazione: casella ${newPosition.casella} - NON VALIDA (occupata)`);
         return false;
       }
       
-      console.log(`🎯 Destinazione: casella ${newPosition.casella} - VALIDA`);
+      console.log(` Destinazione: casella ${newPosition.casella} - VALIDA`);
       return true;
     }
     
     // Se rimane nel percorso, controlla collisioni
-    // ✅ CONTROLLO COLLISIONE per percorso
+    // CONTROLLO COLLISIONE per percorso
     if (isPositionOccupiedBySameColor(newPosition, playerColor, allPlayerPieces, pieceId)) {
-      console.log(`🔄 Percorso: casella ${newPosition.casella} - NON VALIDA (occupata)`);
+      console.log(` Percorso: casella ${newPosition.casella} - NON VALIDA (occupata)`);
       return false;
     }
     
-    console.log(`🔄 Percorso: movimento valido`);
+    console.log(` Percorso: movimento valido`);
     return true;
   }
   
@@ -389,25 +386,25 @@ function canMovePiece(piece, diceValue, turnNumber, playerColor, allPlayerPieces
   if (piece.posizione === 'destinazione') {
     const newSlot = piece.casella + diceValue;
     if (newSlot > 4) {
-      console.log(`🏁 Destinazione: ${piece.casella} + ${diceValue} = ${newSlot} - NON VALIDA (supera 4)`);
+      console.log(`Destinazione: ${piece.casella} + ${diceValue} = ${newSlot} - NON VALIDA (supera 4)`);
       return false;
     }
     
-    // ✅ CONTROLLO COLLISIONE in destinazione
+    //  CONTROLLO COLLISIONE in destinazione
     const newPosition = { posizione: 'destinazione', casella: newSlot };
     if (isPositionOccupiedBySameColor(newPosition, playerColor, allPlayerPieces, pieceId)) {
-      console.log(`🏁 Destinazione: casella ${newSlot} - NON VALIDA (occupata)`);
+      console.log(`Destinazione: casella ${newSlot} - NON VALIDA (occupata)`);
       return false;
     }
     
-    console.log(`🏁 Destinazione: ${piece.casella} + ${diceValue} = ${newSlot} - VALIDA`);
+    console.log(`Destinazione: ${piece.casella} + ${diceValue} = ${newSlot} - VALIDA`);
     return true;
   }
   
   return false;
 }
 
-// ✅ AGGIORNA anche la funzione canPlayerMove
+//  AGGIORNA anche la funzione canPlayerMove
 function canPlayerMove(player, diceValue, turnNumber) {
   for (let i = 0; i < player.pedine.length; i++) {
     if (canMovePiece(player.pedine[i], diceValue, turnNumber, player.color, player.pedine, i)) {
@@ -417,16 +414,16 @@ function canPlayerMove(player, diceValue, turnNumber) {
   return false;
 }
 
-// ✅ SOSTITUISCI questa funzione nel server-gioca.js (circa linea 220)
+//  SOSTITUISCI questa funzione nel server-gioca.js (circa linea 220)
 
 function calculateNewPosition(piece, diceValue, playerColor) {
-  console.log(`🎯 Calcolo mossa: ${playerColor}, posizione: ${piece.posizione}, casella: ${piece.casella}, dado: ${diceValue}`);
+  console.log(` Calcolo mossa: ${playerColor}, posizione: ${piece.posizione}, casella: ${piece.casella}, dado: ${diceValue}`);
   
   // CASO 1: Pedina esce dalla base
   if (piece.posizione === 'base') {
     const startPositions = { blu: 1, rosso: 11, verde: 21, giallo: 31 };
     const newPosition = { posizione: 'percorso', casella: startPositions[playerColor] };
-    console.log(`🚀 Pedina ${playerColor} esce dalla base → casella ${newPosition.casella}`);
+    console.log(`Pedina ${playerColor} esce dalla base → casella ${newPosition.casella}`);
     return newPosition;
   }
   
@@ -440,13 +437,13 @@ function calculateNewPosition(piece, diceValue, playerColor) {
       newCasella = newCasella - 40;
     }
     
-    console.log(`📍 ${playerColor}: ${currentCasella} + ${diceValue} = ${newCasella} (prima del controllo destinazione)`);
+    console.log(`${playerColor}: ${currentCasella} + ${diceValue} = ${newCasella} (prima del controllo destinazione)`);
     
     // Caselle di ingresso destinazione per ogni colore
     const destinationEntries = { blu: 40, rosso: 10, verde: 20, giallo: 30 };
     const entryPoint = destinationEntries[playerColor];
     
-    // ✅ LOGICA CORRETTA: Verifica se deve entrare in destinazione
+    //  LOGICA CORRETTA: Verifica se deve entrare in destinazione
     let shouldEnter = false;
     let stepsToEntry = 0;
     
@@ -455,7 +452,7 @@ function calculateNewPosition(piece, diceValue, playerColor) {
       if (currentCasella < entryPoint && newCasella >= entryPoint) {
         shouldEnter = true;
         stepsToEntry = entryPoint - currentCasella;
-        console.log(`✅ Movimento normale: attraversa casella ${entryPoint}, passi per arrivarci: ${stepsToEntry}`);
+        console.log(` Movimento normale: attraversa casella ${entryPoint}, passi per arrivarci: ${stepsToEntry}`);
       }
     }
     // CASO B: Movimento con wrap-around (attraversa 40→1)
@@ -467,37 +464,37 @@ function calculateNewPosition(piece, diceValue, playerColor) {
         // Caso: pedina prima del punto di ingresso, attraversa durante il wrap
         shouldEnter = true;
         stepsToEntry = entryPoint - currentCasella;
-        console.log(`✅ Wrap-around caso A: attraversa casella ${entryPoint}, passi: ${stepsToEntry}`);
+        console.log(` Wrap-around caso A: attraversa casella ${entryPoint}, passi: ${stepsToEntry}`);
       } else if (newCasella >= entryPoint) {
         // Caso: pedina dopo il wrap raggiunge il punto di ingresso
         shouldEnter = true;
         stepsToEntry = (40 - currentCasella) + entryPoint;
-        console.log(`✅ Wrap-around caso B: raggiunge casella ${entryPoint} dopo wrap, passi: ${stepsToEntry}`);
+        console.log(` Wrap-around caso B: raggiunge casella ${entryPoint} dopo wrap, passi: ${stepsToEntry}`);
       }
     }
     
     if (shouldEnter) {
       const stepsInDestination = diceValue - stepsToEntry;
-      console.log(`🏠 ${playerColor}: entra in destinazione, passi dentro: ${stepsInDestination}`);
+      console.log(` ${playerColor}: entra in destinazione, passi dentro: ${stepsInDestination}`);
       
       if (stepsInDestination <= 0) {
         // Arriva esattamente al punto di ingresso
-        console.log(`🎯 ${playerColor}: entra in destinazione casella 1`);
+        console.log(` ${playerColor}: entra in destinazione casella 1`);
         return { posizione: 'destinazione', casella: 1 };
       } else if (stepsInDestination <= 4) {
         // Entra e avanza nella destinazione
         const finalSlot = stepsInDestination + 1;
-        console.log(`🎯 ${playerColor}: entra in destinazione casella ${finalSlot}`);
+        console.log(` ${playerColor}: entra in destinazione casella ${finalSlot}`);
         return { posizione: 'destinazione', casella: finalSlot };
       } else {
         // Supererebbe la destinazione (più di 4 caselle), rimane nel percorso
-        console.log(`❌ ${playerColor}: supererebbe la destinazione, rimane nel percorso casella ${newCasella}`);
+        console.log(` ${playerColor}: supererebbe la destinazione, rimane nel percorso casella ${newCasella}`);
         return { posizione: 'percorso', casella: newCasella };
       }
     }
     
     // Non entra in destinazione, rimane nel percorso
-    console.log(`🔄 ${playerColor}: rimane nel percorso → casella ${newCasella}`);
+    console.log(` ${playerColor}: rimane nel percorso → casella ${newCasella}`);
     return { posizione: 'percorso', casella: newCasella };
   }
   
@@ -505,10 +502,10 @@ function calculateNewPosition(piece, diceValue, playerColor) {
   if (piece.posizione === 'destinazione') {
     const newSlot = piece.casella + diceValue;
     if (newSlot <= 4) {
-      console.log(`🏁 ${playerColor}: destinazione ${piece.casella} → ${newSlot}`);
+      console.log(`${playerColor}: destinazione ${piece.casella} → ${newSlot}`);
       return { posizione: 'destinazione', casella: newSlot };
     } else {
-      console.log(`❌ ${playerColor}: non può muoversi, supererebbe casella 4`);
+      console.log(` ${playerColor}: non può muoversi, supererebbe casella 4`);
       return piece; // Non può muoversi
     }
   }
@@ -547,7 +544,7 @@ function advanceTurn(game) {
   }
 }
 
-// ✅ AGGIUNGI queste funzioni helper sia nel server-gioca.js che nel client-gioca.js
+//  AGGIUNGI queste funzioni helper sia nel server-gioca.js che nel client-gioca.js
 
 /**
  * Controlla se una posizione è occupata da un'altra pedina dello stesso colore
@@ -573,7 +570,7 @@ function isPositionOccupiedBySameColor(targetPosition, playerColor, allPlayerPie
     // Controlla se l'altra pedina è nella stessa posizione
     if (otherPiece.posizione === targetPosition.posizione && 
         otherPiece.casella === targetPosition.casella) {
-      console.log(`⚠️ Collisione rilevata: posizione ${targetPosition.posizione}-${targetPosition.casella} occupata da pedina ${i}`);
+      console.log(`Collisione rilevata: posizione ${targetPosition.posizione}-${targetPosition.casella} occupata da pedina ${i}`);
       return true;
     }
   }
@@ -602,7 +599,7 @@ function wouldCauseCollision(piece, diceValue, playerColor, allPlayerPieces, pie
     // Client
     newPosition = calculateNewPositionClient(piece, diceValue, playerColor);
   } else {
-    console.error('❌ Funzione calculateNewPosition non trovata');
+    console.error(' Funzione calculateNewPosition non trovata');
     return true; // Blocca la mossa per sicurezza
   }
   
@@ -645,10 +642,10 @@ function getValidMoves(allPlayerPieces, diceValue, playerColor, turnNumber) {
     }
   }
   
-  console.log(`🎯 Mosse valide per ${playerColor} con dado ${diceValue}:`, validMoves);
+  console.log(` Mosse valide per ${playerColor} con dado ${diceValue}:`, validMoves);
   return validMoves;
 }
 
 server.listen(PORT, () => {
-  console.log(`🎮 Server gameplay in ascolto su porta ${PORT}`);
+  console.log(`Server gioca in ascolto su porta ${PORT}`);
 });

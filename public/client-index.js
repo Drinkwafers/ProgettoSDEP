@@ -1,5 +1,5 @@
 // client-index.js - JavaScript per il client Ludo con supporto autenticazione
-// ✅ MODIFICATO: Si connette al server lobby (porta 3001)
+//Si connette al server lobby (porta 3001)
 class LudoClient {
     constructor() {
         this.socket = null;
@@ -61,11 +61,10 @@ class LudoClient {
 
     initializeConnection() {
         try {
-            // ✅ CAMBIATO: Connessione al server lobby (porta 3001)
-            this.socket = new WebSocket('ws://localhost:3001');
+            this.socket = new WebSocket('ws:///10.109.3.17:3001');
 
             this.socket.onopen = () => {
-                console.log('🏠 Connessione WebSocket lobby aperta');
+                console.log('Connessione WebSocket lobby aperta');
                 this.isConnected = true;
                 this.showStatus('Connesso al server lobby', 'success');
                 
@@ -99,7 +98,7 @@ class LudoClient {
     }
 
     handleMessage(message) {
-        console.log('📨 Messaggio lobby ricevuto:', message);
+        console.log('Messaggio lobby ricevuto:', message);
         
         switch (message.type) {
             case 'game-created':
@@ -125,7 +124,7 @@ class LudoClient {
 
     sendMessage(type, data = {}) {
         if (this.socket && this.isConnected) {
-            console.log('📤 Invio messaggio lobby:', type, data);
+            console.log('Invio messaggio lobby:', type, data);
             this.socket.send(JSON.stringify({ type, data }));
         } else {
             this.showStatus('Non connesso al server lobby', 'error');
@@ -212,10 +211,10 @@ class LudoClient {
     handleGameStarted(data) {
         this.gameState = data.gameState;
         
-        console.log('🚀 Partita iniziata! Redirect al gameplay...');
+        console.log('Partita iniziata! Redirect al gameplay...');
         this.showStatus('Partita iniziata! Reindirizzamento...', 'success');
         
-        // ✅ CAMBIATO: Usa l'URL di redirect fornito dal server
+        //Usa l'URL di redirect fornito dal server
         if (data.redirectUrl) {
             // Piccolo delay per mostrare il messaggio
             setTimeout(() => {

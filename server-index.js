@@ -11,7 +11,7 @@ const PORT = process.env.PORT_WS || 3001;
 const GAMEPLAY_PORT = process.env.PORT_GIOCA || 3002;
 const JWT_SECRET = process.env.JWT_SECRET || 'mia_chiave_super_segreta';
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: 'http://10.109.3.17:3000', credentials: true }));
 app.use(cookieParser());
 
 const server = http.createServer(app);
@@ -37,7 +37,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', ws => {
-  console.log('🏠 Connessione lobby WS:', Boolean(ws.user));
+  console.log('Connessione lobby WS:', Boolean(ws.user));
   
   ws.on('message', msgStr => {
     let msg;
@@ -47,13 +47,13 @@ wss.on('connection', ws => {
       return ws.send(JSON.stringify({ type: 'error', message: 'Messaggio non valido' }));
     }
 
-    console.log('📨 Messaggio ricevuto nella lobby:', msg.type);
+    console.log('Messaggio ricevuto nella lobby:', msg.type);
 
     // Auth via sessionStorage token
     if (msg.type === 'auth' && msg.data?.token) {
       try {
         ws.user = jwt.verify(msg.data.token, JWT_SECRET);
-        console.log('✅ Autenticazione lobby WS riuscita per:', ws.user.userName);
+        console.log(' Autenticazione lobby WS riuscita per:', ws.user.userName);
         ws.send(JSON.stringify({ type: 'info', message: 'Autenticazione lobby riuscita' }));
       } catch {
         return ws.send(JSON.stringify({ type: 'error', message: 'Token non valido' }));
@@ -67,7 +67,7 @@ wss.on('connection', ws => {
       const gameId = Math.random().toString(36).substr(2, 8);
       const playerId = Math.random().toString(36).substr(2, 9);
 
-      console.log(`🎲 Creazione partita: ${gameId} per ${name}`);
+      console.log(`Creazione partita: ${gameId} per ${name}`);
 
       // Rileva se l'utente è autenticato
       const isAuth = ws.user && ws.user.userId;
@@ -82,7 +82,7 @@ wss.on('connection', ws => {
       };
 
       const gameState = {
-        gameId: gameId, // ✅ Aggiungi gameId al gameState
+        gameId: gameId, //  Aggiungi gameId al gameState
         players: [playerEntry],
         host: playerId,
         gameData: {
@@ -101,7 +101,7 @@ wss.on('connection', ws => {
         data: { gameId, playerId, gameState }
       }));
       
-      console.log('✅ Partita creata e aggiunta alla lobby');
+      console.log(' Partita creata e aggiunta alla lobby');
       return;
     }
 
@@ -110,10 +110,10 @@ wss.on('connection', ws => {
       const { gameId, playerName } = msg.data;
       const game = lobbyGames[gameId];
 
-      console.log(`👥 Tentativo join: ${playerName} -> ${gameId}`);
+      console.log(`Tentativo join: ${playerName} -> ${gameId}`);
 
       if (!game || game.players.length >= 4) {
-        console.log('❌ Join fallito: partita non trovata o piena');
+        console.log(' Join fallito: partita non trovata o piena');
         return ws.send(JSON.stringify({
           type: 'error',
           message: 'Impossibile entrare nella partita'
@@ -137,7 +137,7 @@ wss.on('connection', ws => {
       game.players.push(playerEntry);
       lobbyPlayerSockets[playerId] = ws;
 
-      console.log(`✅ ${playerName} si è unito. Giocatori: ${game.players.length}/4`);
+      console.log(` ${playerName} si è unito. Giocatori: ${game.players.length}/4`);
 
       // Notifica join
       ws.send(JSON.stringify({
@@ -165,7 +165,7 @@ wss.on('connection', ws => {
       
       if (!game) return;
       
-      console.log(`👋 ${playerId} lascia la partita ${gameId}`);
+      console.log(` ${playerId} lascia la partita ${gameId}`);
       
       // Rimuovi il giocatore
       game.players = game.players.filter(p => p.id !== playerId);
@@ -174,13 +174,13 @@ wss.on('connection', ws => {
       // Se era l'host e ci sono altri giocatori, cambia host
       if (game.host === playerId && game.players.length > 0) {
         game.host = game.players[0].id;
-        console.log(`👑 Nuovo host: ${game.players[0].name}`);
+        console.log(` Nuovo host: ${game.players[0].name}`);
       }
       
       // Se non ci sono più giocatori, elimina la partita
       if (game.players.length === 0) {
         delete lobbyGames[gameId];
-        console.log(`🗑️ Partita ${gameId} eliminata (vuota)`);
+        console.log(` Partita ${gameId} eliminata (vuota)`);
         return;
       }
       
@@ -209,7 +209,7 @@ wss.on('connection', ws => {
         }));
       }
       
-      console.log(`🚀 Avvio partita: ${gameId}`);
+      console.log(`Avvio partita: ${gameId}`);
       
       // Assegna colori e pedine
       const colors = ['blu', 'rosso', 'verde', 'giallo'];
@@ -222,11 +222,11 @@ wss.on('connection', ws => {
       game.status = 'playing';
       game.gameData.turnoNumero = 1;
       
-      // ✅ TRASFERIMENTO AL SERVER GAMEPLAY
-      console.log(`📤 Trasferimento partita ${gameId} al server gameplay`);
+      //  TRASFERIMENTO AL SERVER GAMEPLAY
+      console.log(`Trasferimento partita ${gameId} al server gameplay`);
       
       // Crea connessione al server gameplay per trasferire la partita
-      const gameplayWs = new WebSocket(`ws://localhost:${GAMEPLAY_PORT}`);
+      const gameplayWs = new WebSocket(`ws://10.109.3.17:${GAMEPLAY_PORT}`);
       
       gameplayWs.on('open', () => {
         // Invia la partita al server gameplay
@@ -235,7 +235,7 @@ wss.on('connection', ws => {
           data: { gameState: game }
         }));
         
-        console.log('✅ Partita trasferita al server gameplay');
+        console.log(' Partita trasferita al server gameplay');
         
         // Chiudi la connessione di trasferimento
         gameplayWs.close();
@@ -262,11 +262,11 @@ wss.on('connection', ws => {
           delete lobbyPlayerSockets[p.id];
         });
         
-        console.log(`🧹 Partita ${gameId} rimossa dalla lobby`);
+        console.log(` Partita ${gameId} rimossa dalla lobby`);
       });
       
       gameplayWs.on('error', (error) => {
-        console.error('❌ Errore connessione al server gameplay:', error);
+        console.error(' Errore connessione al server gameplay:', error);
         ws.send(JSON.stringify({ 
           type: 'error', 
           message: 'Impossibile avviare la partita. Server gameplay non disponibile.' 
@@ -279,12 +279,12 @@ wss.on('connection', ws => {
 
   // Gestione disconnessione
   ws.on('close', () => {
-    console.log('❌ Connessione lobby chiusa');
+    console.log(' Connessione lobby chiusa');
     
     // Trova e rimuovi il giocatore dai socket
     for (const [playerId, socket] of Object.entries(lobbyPlayerSockets)) {
       if (socket === ws) {
-        console.log(`👋 Player ${playerId} disconnesso dalla lobby`);
+        console.log(`Player ${playerId} disconnesso dalla lobby`);
         
         // Trova la partita del giocatore e gestisci la disconnessione
         for (const [gameId, game] of Object.entries(lobbyGames)) {
@@ -324,5 +324,5 @@ wss.on('connection', ws => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🏠 Server lobby in ascolto su porta ${PORT}`);
+  console.log(`Server lobby in ascolto su porta ${PORT}`);
 });

@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 
 // 1) Configurazione connessione MySQL
 const sequelize = new Sequelize('sdep_db', 'admin', '#C4labriaM!a', {
-  host: 'localhost',
+  host: '10.109.3.17',
   dialect: 'mysql',
   pool: {
     max: 10,
@@ -71,11 +71,11 @@ RefreshToken.belongsTo(User, { foreignKey: 'userId' });
 (async () => {
   try {
     await sequelize.authenticate();
-    console.log('✅ Connessione a MySQL OK');
+    console.log('Connessione a MySQL OK');
     await sequelize.sync();  
-    console.log('✅ Modelli sincronizzati con il database');
+    console.log('Modelli sincronizzati con il database');
   } catch (err) {
-    console.error('❌ Errore di connessione o sync:', err);
+    console.error('Errore di connessione o sync:', err);
   }
 })();
 
